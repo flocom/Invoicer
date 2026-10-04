@@ -132,7 +132,7 @@ Everything is optional — an empty `.env` works. See [.env.example](.env.exampl
 | `ACME_EMAIL` | *(empty)* | Contact address for Let's Encrypt |
 | `DOMAIN` | *(auto)* | Restrict built-in certificates to this host name |
 | `AUTO_UPDATE` | `true` | `false` only notifies (critical/mandatory releases are still installed) |
-| `TRUST_PROXY` | *(auto)* | `true`/`false` to force trusting `X-Forwarded-*` headers (auto = private networks only) |
+| `TRUST_PROXY` | *(auto)* | `false` if the container is exposed directly (no proxy), `cloudflare` behind Cloudflare to honour `CF-Connecting-IP`, `true` to trust any peer. Auto = trust `X-Forwarded-*` from private networks only; always `false` with `TLS=auto` |
 | `INVOICER_MASTER_KEY` | *(file)* | 32-byte base64 key to keep the encryption key out of the data volume |
 | `PORT` | `8080` | Plain HTTP port inside the container |
 
@@ -151,13 +151,16 @@ Issued invoices are immutable (numbering without gaps, buyer/seller details froz
 ## 🔒 Security
 
 - Single static Go binary on a distroless, non-root image (~20 MB), read-only root filesystem, no shell
-- Argon2id password hashing, progressive account lockout, rate limiting, optional TOTP 2FA with recovery codes
+- Argon2id password hashing (OWASP parameters, bounded concurrency so it cannot exhaust memory), optional TOTP 2FA with recovery codes
+- Login throttling per client *and* account: an attacker burns only their own attempts and cannot lock the real user out; identical answers for unknown accounts
 - Session tokens stored hashed, `HttpOnly`/`Secure`/`SameSite` cookies, session rotation on login
 - CSRF tokens on every form plus `Origin` checks; strict Content-Security-Policy without inline scripts or styles; HSTS, `X-Frame-Options`, `nosniff`…
 - API keys and 2FA secrets encrypted with AES-256-GCM, bound to their record
 - Uploaded logos are decoded and re-encoded; public invoice links use 192-bit random tokens
 - Stripe webhooks verified (HMAC-SHA256, timestamp tolerance) and re-fetched from the Stripe API
-- Audit log of sensitive actions; the e-mail links use the recorded public URL so a forged `Host` header cannot poison them
+- Audit log of sensitive actions; the e-mail links use the recorded public URL so a forged `Host` header cannot poison them (changing it is owner-only and password-confirmed)
+- Release pipeline: actions pinned by SHA, signing key confined to a `release` environment limited to `main`, Docker images signed with Sigstore cosign:
+  `cosign verify ghcr.io/flocom/invoicer:latest --certificate-identity-regexp 'https://github.com/flocom/Invoicer/' --certificate-oidc-issuer https://token.actions.githubusercontent.com`
 
 ## 🔄 Updates
 
@@ -203,9 +206,9 @@ go test ./...
 
 Every push to `main` publishes a new version automatically ([.github/workflows/release.yml](.github/workflows/release.yml)): the next tag is computed from the previous one (patch by default, minor for `feat:` commits, major for `BREAKING CHANGE` / `#major`), then the binaries are built, the update manifest is signed, the GitHub release is created and the Docker image is pushed. Running instances pick it up on their next update check.
 
-Commit message keywords: `[skip release]`, `[critical]` (install everywhere immediately), `[min:vX.Y.Z]` (force instances below that version to update).
+Commit message keyword: `[skip release]`. Forcing an immediate install everywhere (*critical*, *minimum version*) is only possible from a manual run (*Actions → Release → Run workflow*), never from commit text.
 
-The workflow needs the repository secret `RELEASE_SIGNING_KEY` (the private key matching [internal/updater/key.go](internal/updater/key.go)). To rotate keys: `go run ./cmd/release keygen`, put the new public key in `key.go`, publish that release while the secret still holds the old key, then replace the secret with the new private key for the following releases.
+The workflow needs the secret `RELEASE_SIGNING_KEY` in the `release` environment (restricted to `main`; add required reviewers there if you want to approve each release) (the private key matching [internal/updater/key.go](internal/updater/key.go)). To rotate keys: `go run ./cmd/release keygen`, put the new public key in `key.go`, publish that release while the secret still holds the old key, then replace the secret with the new private key for the following releases.
 
 ## 📄 License
 

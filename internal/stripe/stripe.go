@@ -204,6 +204,11 @@ func CreateCheckout(ctx context.Context, key string, p CheckoutParams) (*Session
 	return &s, nil
 }
 
+// ExpireCheckout closes an open Checkout Session so it can no longer be paid.
+func ExpireCheckout(ctx context.Context, key, id string) error {
+	return call(ctx, key, http.MethodPost, "/v1/checkout/sessions/"+url.PathEscape(id)+"/expire", url.Values{}, nil)
+}
+
 func GetCheckout(ctx context.Context, key, id string) (*Session, error) {
 	var s Session
 	if err := call(ctx, key, http.MethodGet, "/v1/checkout/sessions/"+url.PathEscape(id), nil, &s); err != nil {

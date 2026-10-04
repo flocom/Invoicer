@@ -17,7 +17,7 @@ import (
 // is sent to the client. They never expose anything beyond the invoice.
 
 func (s *Server) publicLoad(c *Ctx) (*store.Invoice, *store.Company, error) {
-	if !s.limiter.allow("public:"+c.IP, 60, time.Minute) {
+	if !s.limiter.allow("public:"+c.RL, 60, time.Minute) {
 		return nil, nil, store.ErrNotFound
 	}
 	inv, err := s.Store.InvoiceByToken(c.R.PathValue("token"))

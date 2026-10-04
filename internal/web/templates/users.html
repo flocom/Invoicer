@@ -78,6 +78,18 @@
   {{if $d.Companies}}<fieldset class="field"><legend>{{.T "users.companies"}}</legend>
     {{range $d.Companies}}<label class="check"><input type="checkbox" name="companies" value="{{.ID}}"> {{.Name}}</label>{{end}}</fieldset>{{end}}
   <button class="btn btn-primary" type="submit">{{.T "users.create_invite"}}</button>
+  {{if $d.Invites}}
+  <div class="stack small">
+    <h3>{{.T "users.pending_invites"}}</h3>
+    <ul class="list small">
+      {{range $d.Invites}}
+      <li><span>{{.Email}} <span class="muted">· {{$.TS "role." .Role}} · {{$.T "users.expires" ($.DateTime .ExpiresAt)}}</span></span>
+        {{if or $.User.IsOwner (eq .Role "member")}}<button class="link small" type="submit" form="revoke-{{.ID}}">{{$.T "users.revoke"}}</button>{{end}}</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
 </form>
+{{range $d.Invites}}<form id="revoke-{{.ID}}" method="post" action="/admin/invites/{{.ID}}/revoke" hidden><input type="hidden" name="csrf" value="{{$.CSRF}}"></form>{{end}}
 </div>
 {{end}}

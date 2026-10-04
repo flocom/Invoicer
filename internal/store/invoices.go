@@ -541,6 +541,25 @@ func (s *Store) SetStripeSessionStatus(id, status string) {
 	s.DB.Exec(`UPDATE stripe_sessions SET status = ? WHERE id = ?`, status, id)
 }
 
+// OpenStripeSessions lists the sessions of an invoice that may still be paid.
+func (s *Store) OpenStripeSessions(invoiceID int64) ([]StripeSession, error) {
+	rows, err := s.DB.Query(`SELECT id, invoice_id, amount, url, status, created_at, expires_at FROM stripe_sessions
+		WHERE invoice_id = ? AND status = 'open' AND expires_at > ?`, invoiceID, now())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StripeSession
+	for rows.Next() {
+		var ss StripeSession
+		if err := rows.Scan(&ss.ID, &ss.InvoiceID, &ss.Amount, &ss.URL, &ss.Status, &ss.CreatedAt, &ss.ExpiresAt); err != nil {
+			return nil, err
+		}
+		out = append(out, ss)
+	}
+	return out, rows.Err()
+}
+
 // PendingStripeSessions lists recent open sessions so payments can be
 // reconciled even if a webhook was missed.
 func (s *Store) PendingStripeSessions() ([]StripeSession, error) {

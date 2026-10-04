@@ -64,6 +64,14 @@ func (s *Server) recurringForm(c *Ctx) error {
 	return s.render(c, 200, "recurring_form", s.page(c, title, "recurring", d))
 }
 
+func addDays(iso string, n int) string {
+	d, err := time.Parse("2006-01-02", iso)
+	if err != nil {
+		return iso
+	}
+	return d.AddDate(0, 0, n).Format("2006-01-02")
+}
+
 func previewRuns(r *store.Recurring, n int) []string {
 	var out []string
 	d := r.NextRun
@@ -92,6 +100,7 @@ func (s *Server) recurringSave(c *Ctx) error {
 		}
 		isNew = false
 	}
+	origNext := r.NextRun
 	r.ClientID, _ = strconv.ParseInt(c.form("client_id"), 10, 64)
 	r.Name = clip(c.form("name"), 200)
 	r.Currency = c.form("currency")
@@ -137,6 +146,10 @@ func (s *Server) recurringSave(c *Ctx) error {
 	}
 	if !validDate(r.NextRun) || (r.EndDate != "" && !validDate(r.EndDate)) {
 		return fail("err.dates")
+	}
+	// a start date far in the past would issue a burst of numbered invoices
+	if r.NextRun != origNext && (r.NextRun < addDays(s.App.Today(), -31) || r.NextRun > addDays(s.App.Today(), 3660)) {
+		return fail("err.recurring_start")
 	}
 	if r.DueDays < 0 || r.DueDays > 365 {
 		return fail("err.dates")

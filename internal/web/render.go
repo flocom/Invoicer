@@ -180,7 +180,7 @@ func (s *Server) page(c *Ctx, title, nav string, data any) *Page {
 		Version: config.Version, AssetVer: s.assetVer, BaseURL: s.App.BaseURL(), loc: s.App.Location(), today: s.App.Today()}
 	if c.User != nil {
 		p.Companies, _ = s.Store.CompaniesFor(c.User, false)
-		if c.User.IsAdmin() {
+		if c.User.IsOwner() {
 			if o := s.detectOrigin(c.R); o != "" && o != p.BaseURL && p.BaseURL != "" {
 				p.NewOrigin = o
 			}
@@ -230,7 +230,7 @@ func (s *Server) renderError(c *Ctx, status int, key string) {
 
 func (c *Ctx) flash(kind, msg string) {
 	b, _ := json.Marshal(Flash{Kind: kind, Msg: msg})
-	http.SetCookie(c.W, &http.Cookie{Name: cookieFlash, Value: base64.RawURLEncoding.EncodeToString(b), Path: "/",
+	http.SetCookie(c.W, &http.Cookie{Name: cookieFlash, Value: c.s.signPreCSRF(base64.RawURLEncoding.EncodeToString(b)), Path: "/",
 		HttpOnly: true, Secure: c.s.isHTTPS(c.R), SameSite: http.SameSiteLaxMode, MaxAge: 60})
 }
 
@@ -243,7 +243,12 @@ func (s *Server) popFlash(c *Ctx) *Flash {
 		return nil
 	}
 	http.SetCookie(c.W, &http.Cookie{Name: cookieFlash, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.isHTTPS(c.R)})
-	b, err := base64.RawURLEncoding.DecodeString(ck.Value)
+	// signed so another site or sub-domain cannot plant fake messages
+	if !s.validPreCSRF(ck.Value) {
+		return nil
+	}
+	raw, _, _ := strings.Cut(ck.Value, ".")
+	b, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil || len(b) > 2000 {
 		return nil
 	}

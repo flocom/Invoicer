@@ -191,7 +191,7 @@ func serve(cfg config.Config) error {
 // public URL is known, only for that host.
 func hostPolicy(a *app.App) autocert.HostPolicy {
 	var mu sync.Mutex
-	seen := map[string]bool{}
+	seen := map[string]time.Time{}
 	return func(ctx context.Context, host string) error {
 		host = strings.ToLower(host)
 		if net.ParseIP(host) != nil || !strings.Contains(host, ".") || strings.HasSuffix(host, ".local") {
@@ -209,13 +209,20 @@ func hostPolicy(a *app.App) autocert.HostPolicy {
 			}
 			return errors.New("host not allowed")
 		}
-		// before setup: allow at most 3 distinct names to limit abuse
+		// before setup: at most 3 names at a time, each slot freed after 10 minutes
+		// so bogus SNI names cannot block the real domain for long (set DOMAIN to
+		// avoid this window entirely)
 		mu.Lock()
 		defer mu.Unlock()
-		if !seen[host] && len(seen) >= 3 {
+		for h, t := range seen {
+			if time.Since(t) > 10*time.Minute {
+				delete(seen, h)
+			}
+		}
+		if _, ok := seen[host]; !ok && len(seen) >= 3 {
 			return errors.New("host not allowed")
 		}
-		seen[host] = true
+		seen[host] = time.Now()
 		return nil
 	}
 }

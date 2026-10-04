@@ -127,7 +127,15 @@ func (s *Store) UpdateUserProfile(id int64, name, lang string) error {
 
 func (s *Store) SetPassword(id int64, hash string) error {
 	_, err := s.DB.Exec(`UPDATE users SET password_hash = ?, failed_logins = 0, locked_until = 0 WHERE id = ?`, hash, id)
+	s.DeletePasswordResets(id)
 	return err
+}
+
+// DeletePasswordResets invalidates every outstanding reset link of a user.
+// It is called whenever the account's password, role or ownership changes so
+// a link created under earlier permissions cannot be replayed.
+func (s *Store) DeletePasswordResets(userID int64) {
+	s.DB.Exec(`DELETE FROM password_resets WHERE user_id = ?`, userID)
 }
 
 func (s *Store) SetUserRole(id int64, role string) error {
@@ -135,11 +143,13 @@ func (s *Store) SetUserRole(id int64, role string) error {
 		return errors.New("use TransferOwnership")
 	}
 	_, err := s.DB.Exec(`UPDATE users SET role = ? WHERE id = ? AND role != 'owner'`, role, id)
+	s.DeletePasswordResets(id)
 	return err
 }
 
 func (s *Store) SetUserDisabled(id int64, disabled bool) error {
 	_, err := s.DB.Exec(`UPDATE users SET disabled = ? WHERE id = ? AND role != 'owner'`, b2i(disabled), id)
+	s.DeletePasswordResets(id)
 	if err == nil && disabled {
 		_, err = s.DB.Exec(`DELETE FROM sessions WHERE user_id = ?`, id)
 	}
@@ -156,6 +166,9 @@ func (s *Store) TransferOwnership(from, to int64) error {
 		if _, err := tx.Exec(`UPDATE users SET role = 'admin' WHERE id = ? AND role = 'owner'`, from); err != nil {
 			return err
 		}
+		if _, err := tx.Exec(`DELETE FROM password_resets WHERE user_id IN (?, ?)`, from, to); err != nil {
+			return err
+		}
 		res, err := tx.Exec(`UPDATE users SET role = 'owner' WHERE id = ? AND disabled = 0`, to)
 		if err != nil {
 			return err
@@ -167,22 +180,11 @@ func (s *Store) TransferOwnership(from, to int64) error {
 	})
 }
 
+// RecordLoginFailure counts failures for information only. Throttling is done
+// per client and account (see web.loginFailKey) so that nobody can lock an
+// account out by guessing wrong on purpose.
 func (s *Store) RecordLoginFailure(id int64) {
-	// progressive lockout: 5 failures -> 1 min, then doubling up to 1 hour
-	u, err := s.User(id)
-	if err != nil {
-		return
-	}
-	f := u.FailedLogins + 1
-	var lock int64
-	if f >= 5 {
-		d := time.Minute << min(f-5, 6)
-		if d > time.Hour {
-			d = time.Hour
-		}
-		lock = time.Now().Add(d).Unix()
-	}
-	s.DB.Exec(`UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?`, f, lock, id)
+	s.DB.Exec(`UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ?`, id)
 }
 
 func (s *Store) RecordLoginSuccess(id int64) {
@@ -204,6 +206,22 @@ func (s *Store) UseTOTPCounter(id int64, counter int64) bool {
 	}
 	n, _ := res.RowsAffected()
 	return n == 1
+}
+
+// ReplaceRecoveryCodes swaps the code list only if it still equals old.
+func (s *Store) ReplaceRecoveryCodes(id int64, old, codes string) bool {
+	res, err := s.DB.Exec(`UPDATE users SET recovery_codes = ? WHERE id = ? AND recovery_codes = ?`, codes, id, old)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n == 1
+}
+
+// UpdatePasswordHash re-hashes a password with current parameters (same
+// password: sessions and reset links are kept).
+func (s *Store) UpdatePasswordHash(id int64, hash string) {
+	s.DB.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, hash, id)
 }
 
 func (s *Store) SetRecoveryCodes(id int64, codes string) error {
@@ -323,6 +341,45 @@ func (s *Store) Invite(tokenHash []byte) (*Invite, error) {
 	return &inv, nil
 }
 
+type PendingInvite struct {
+	ID        string // hex of the token hash (cannot be used to accept)
+	Email     string
+	Role      string
+	ExpiresAt int64
+}
+
+func (s *Store) PendingInvites() ([]PendingInvite, error) {
+	rows, err := s.DB.Query(`SELECT lower(hex(token_hash)), email, role, expires_at FROM invites
+		WHERE used_at = 0 AND expires_at > ? ORDER BY created_at DESC`, now())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PendingInvite
+	for rows.Next() {
+		var p PendingInvite
+		if err := rows.Scan(&p.ID, &p.Email, &p.Role, &p.ExpiresAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// RevokeInvite deletes a pending invitation; admins may only revoke member
+// invitations, the owner any.
+func (s *Store) RevokeInvite(id string, owner bool) (string, error) {
+	var email, role string
+	if err := s.DB.QueryRow(`SELECT email, role FROM invites WHERE lower(hex(token_hash)) = ? AND used_at = 0`, id).Scan(&email, &role); err != nil {
+		return "", notFound(err)
+	}
+	if role != RoleMember && !owner {
+		return "", ErrNotFound
+	}
+	_, err := s.DB.Exec(`DELETE FROM invites WHERE lower(hex(token_hash)) = ? AND used_at = 0`, id)
+	return email, err
+}
+
 // AcceptInvite consumes the invite and creates the account in one transaction.
 func (s *Store) AcceptInvite(tokenHash []byte, name, hash, lang string) (*User, error) {
 	inv, err := s.Invite(tokenHash)
@@ -358,6 +415,7 @@ func (s *Store) AcceptInvite(tokenHash []byte, name, hash, lang string) (*User, 
 }
 
 func (s *Store) CreatePasswordReset(tokenHash []byte, userID int64, ttl time.Duration) error {
+	s.DeletePasswordResets(userID) // only the newest link is valid
 	_, err := s.DB.Exec(`INSERT INTO password_resets(token_hash, user_id, created_at, expires_at) VALUES(?,?,?,?)`,
 		tokenHash, userID, now(), time.Now().Add(ttl).Unix())
 	return err

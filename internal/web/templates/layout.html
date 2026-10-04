@@ -75,12 +75,10 @@
 
   <main class="main">
     {{if .NewOrigin}}
-    <form method="post" action="/admin/system/domain" class="banner">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <input type="hidden" name="back" value="{{if .Company}}{{.CPath ""}}{{else}}/{{end}}">
+    <div class="banner">
       <span>{{.T "banner.new_origin" .NewOrigin .BaseURL}}</span>
-      <button class="btn btn-sm" type="submit">{{.T "banner.use_origin"}}</button>
-    </form>
+      <a class="btn btn-sm" href="/admin/system">{{.T "banner.review"}}</a>
+    </div>
     {{end}}
     {{if eq .UpdateNote "required"}}
     <div class="banner banner-warn"><span>{{.T "banner.update_required"}}</span> <a class="btn btn-sm" href="/admin/system">{{.T "nav.system"}}</a></div>

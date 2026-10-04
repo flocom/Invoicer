@@ -1,0 +1,13 @@
+# Keeps pinned dependencies (Go modules, GitHub Actions SHAs, base image
+# digests) up to date with reviewable pull requests.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }

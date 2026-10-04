@@ -37,6 +37,7 @@
         <form method="post" action="/account/2fa/disable" class="stack" data-confirm="{{.T "account.2fa_disable_confirm"}}">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <div class="field"><label for="cur2">{{.T "field.current_password"}}</label><input id="cur2" name="current" type="password" required autocomplete="current-password"></div>
+          <div class="field"><label for="code2">{{.T "mfa.code"}}</label><input id="code2" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="11" class="mono code-input"></div>
           <button class="btn btn-danger-ghost" type="submit">{{.T "account.2fa_disable"}}</button>
         </form>
       {{else if $d.TOTPSetup}}
