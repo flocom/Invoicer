@@ -118,6 +118,7 @@
     {{if $c.HasResend}}<p class="status-line ok">{{template "icon" "check"}}{{.T "settings.email_ready"}}</p>
     <form method="post" action="{{.CPath "/settings/email/test"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{template "icon" "send"}}{{.T "settings.send_test" .User.Email}}</button></form>
     {{else}}<p class="status-line off">{{template "icon" "x"}}{{.T "settings.email_not_ready"}}</p>{{end}}
+    <p class="hint">{{if $c.EmailBankDetails}}{{.T "settings.bank_in_emails_on"}}{{else}}{{.T "settings.bank_in_emails_off"}}{{end}} <a href="?tab=payments#banks">{{.T "settings.tab_payments"}}</a></p>
   </div>
   <div class="card stack small">
     <h3>{{.T "settings.how_to"}}</h3>

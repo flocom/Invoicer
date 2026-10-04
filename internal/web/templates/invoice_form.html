@@ -42,6 +42,7 @@
     <label class="check"><input type="checkbox" name="reminders" value="1" {{if $inv.RemindersEnabled}}checked{{end}}> {{.T "invoice.auto_reminders"}}</label>
   </div>
 
+  {{if $d.CanSend}}<div class="card stack small send-options">{{template "bankmail" (dict "P" $ "Any" $d.Banks)}}</div>{{end}}
   <div class="form-actions sticky-actions">
     <button class="btn" type="submit" name="action" value="save">{{.T "invoice.save_draft"}}</button>
     <button class="btn" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.save_issue"}}</button>

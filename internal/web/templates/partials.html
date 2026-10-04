@@ -126,3 +126,19 @@
   <option value="none" {{if eq .Sel -1}}selected{{end}}>{{$p.T "bank.none"}}</option>
 </select>
 {{end}}
+
+{{/* "include bank details" option of every send form */}}
+{{define "bankmail"}}
+{{$p := .P}}
+{{if .Bank}}
+  <input type="hidden" name="bank_present" value="1">
+  <label class="check small"><input type="checkbox" name="bank" value="1" {{if $p.Company.EmailBankDetails}}checked{{end}}> {{$p.T "invoice.include_bank_named" .Bank.Name}}</label>
+{{else if .Any}}
+  <input type="hidden" name="bank_present" value="1">
+  <label class="check small"><input type="checkbox" name="bank" value="1" {{if $p.Company.EmailBankDetails}}checked{{end}}> {{$p.T "invoice.include_bank_selected"}}</label>
+{{else if $p.Company.HasBank}}
+  <p class="hint">{{$p.T "invoice.bank_none_for_invoice"}}</p>
+{{else}}
+  <p class="hint">{{$p.T "invoice.bank_add_first"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments#banks"}}">{{$p.T "settings.add_bank_account"}}</a>{{end}}</p>
+{{end}}
+{{end}}

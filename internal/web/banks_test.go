@@ -100,3 +100,34 @@ func containsAny(s string, subs ...string) bool {
 	}
 	return false
 }
+
+func TestBankEmailOptionVisible(t *testing.T) {
+	e := newEnv(t)
+	b := setupOwner(t, e)
+	st := e.app.Store
+	b.post("/companies/new", url.Values{"name": {"Mail"}, "currency": {"EUR"}, "lang": {"en"}})
+	co, _ := st.Company(1)
+	st.UpdateCompanyEmail(1, e.app.SealResend(co, "re_test_key"), false, "Mail <billing@example.test>", "", "")
+	b.post("/c/1/clients/new", url.Values{"name": {"Client"}, "email": {"c@example.test"}, "lang": {"en"}})
+
+	// no account yet: the editor explains how to get the option
+	b.get("/c/1/invoices/new")
+	b.must("add a bank account first")
+
+	b.post("/c/1/settings/bank/accounts", url.Values{"currency": {"EUR"}, "label": {"Main"}, "iban": {"FR7630006000011234567890189"}})
+	b.get("/c/1/invoices/new")
+	b.must("Include bank transfer details (account selected above)")
+
+	today := e.app.Today()
+	due := time.Now().AddDate(0, 0, 30).Format("2006-01-02")
+	b.post("/c/1/invoices/new", url.Values{"client_id": {"1"}, "currency": {"EUR"}, "lang": {"en"}, "issue_date": {today}, "due_date": {due},
+		"line_desc": {"Work"}, "line_qty": {"1"}, "line_price": {"100"}, "line_tax": {"0"}, "action": {"save"}})
+	b.get("/c/1/invoices/1")
+	b.must("Include bank details (Main · EUR · …0189)") // on "Issue & send"
+
+	// a currency without account explains why nothing will be included
+	b.post("/c/1/invoices/1/edit", url.Values{"client_id": {"1"}, "currency": {"USD"}, "lang": {"en"}, "issue_date": {today}, "due_date": {due},
+		"line_desc": {"Work"}, "line_qty": {"1"}, "line_price": {"100"}, "line_tax": {"0"}, "action": {"save"}})
+	b.get("/c/1/invoices/1")
+	b.must("no account in this invoice")
+}
