@@ -156,20 +156,35 @@
   <button class="btn btn-danger-ghost" type="submit">{{.T "settings.stripe_disconnect"}}</button>
 </form>
 {{end}}
-<form method="post" action="{{.CPath "/settings/bank"}}" class="card stack" id="bank">
+<div class="card stack" id="banks">
+  <h2>{{.T "settings.bank_accounts"}}</h2>
+  <p class="hint">{{.T "settings.bank_accounts_hint"}}</p>
+  {{range $d.Banks}}
+  <details class="bank-item">
+    <summary><strong>{{.Name}}</strong>{{if .IBAN}} <span class="muted mono small">{{iban .IBAN}}</span>{{end}}</summary>
+    <form method="post" action="{{$.CPath "/settings/bank/accounts/%d" .ID}}" class="stack">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      {{template "bankfields" (dict "P" $ "B" . "C" $c)}}
+      <div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">{{$.T "action.save"}}</button>
+        <button class="btn btn-danger-ghost btn-sm" type="submit" form="bank-del-{{.ID}}">{{template "icon" "trash"}}{{$.T "action.delete"}}</button></div>
+    </form>
+    <form id="bank-del-{{.ID}}" method="post" action="{{$.CPath "/settings/bank/accounts/%d/delete" .ID}}" hidden data-confirm="{{$.T "bank.delete_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"></form>
+  </details>
+  {{else}}<p class="empty-inline">{{.T "settings.no_bank_accounts"}}</p>{{end}}
+  <details class="disclosure" {{if not $d.Banks}}open{{end}}>
+    <summary>+ {{.T "settings.add_bank_account"}}</summary>
+    <form method="post" action="{{.CPath "/settings/bank/accounts"}}" class="stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      {{template "bankfields" (dict "P" $ "B" nil "C" $c)}}
+      <div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">{{.T "settings.add_bank_account"}}</button></div>
+    </form>
+  </details>
+</div>
+<form method="post" action="{{.CPath "/settings/bank"}}" class="card stack">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
-  <h2>{{.T "settings.bank"}}</h2>
-  <p class="hint">{{.T "settings.bank_hint"}}</p>
-  <div class="field"><label for="bank_holder">{{.T "field.account_holder"}}</label><input id="bank_holder" name="bank_holder" maxlength="200" value="{{$c.BankHolder}}" placeholder="{{$c.DisplayName}}"></div>
-  <div class="field"><label for="bank_name">{{.T "field.bank_name"}}</label><input id="bank_name" name="bank_name" maxlength="200" value="{{$c.BankName}}"></div>
-  <div class="grid-2">
-    <div class="field"><label for="iban">IBAN</label><input id="iban" name="iban" maxlength="40" value="{{$c.IBAN}}" class="mono"></div>
-    <div class="field"><label for="bic">BIC / SWIFT</label><input id="bic" name="bic" maxlength="15" value="{{$c.BIC}}" class="mono"></div>
-  </div>
-  <div class="field"><label for="bank_extra">{{.T "field.bank_extra"}}</label><textarea id="bank_extra" name="bank_extra" rows="2" maxlength="600">{{$c.BankExtra}}</textarea><p class="hint">{{.T "field.bank_extra_hint"}}</p></div>
   <label class="check"><input type="checkbox" name="email_bank_details" value="1" {{if $c.EmailBankDetails}}checked{{end}}> {{.T "settings.email_bank_details"}}</label>
   <p class="hint">{{.T "settings.email_bank_details_hint"}}</p>
-  <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+  <div class="form-actions"><button class="btn btn-sm" type="submit">{{.T "action.save"}}</button></div>
 </form>
 </div>
 <div class="card stack small">
@@ -180,7 +195,7 @@
     <li>{{if $d.PublicHTTPS}}{{.T "settings.stripe_how3" $d.WebhookURL}}{{else}}{{.T "settings.stripe_how3_local"}}{{end}}</li>
     <li>{{.T "settings.stripe_how4"}}</li>
   </ul>
-  <p class="hint">{{.T "settings.bank_transfer_note"}} <a href="#bank">{{.T "settings.bank"}}</a></p>
+  <p class="hint">{{.T "settings.bank_transfer_note"}} <a href="#banks">{{.T "settings.bank_accounts"}}</a></p>
 </div>
 </div>
 {{end}}

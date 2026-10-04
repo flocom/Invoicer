@@ -383,6 +383,9 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 .paper .notes, .public-card .notes { margin-top: 1.25rem; }
 .disclosure { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: .85rem; }
 .disclosure summary { cursor: pointer; font-weight: 600; color: var(--primary); margin-bottom: .85rem; }
+.bank-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .65rem .85rem; }
+.bank-item summary { cursor: pointer; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+.bank-item[open] summary { margin-bottom: .85rem; }
 .danger-box summary { color: var(--danger-strong); display: flex; align-items: center; gap: .4rem; }
 .danger-box .note { margin-bottom: .75rem; }
 

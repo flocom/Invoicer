@@ -41,6 +41,7 @@ type Company struct {
 	RemindersEnabled    bool
 	ReminderDays        string
 	EmailBankDetails    bool
+	BankCount           int // number of bank accounts
 	Archived            bool
 	CreatedAt           int64
 }
@@ -54,7 +55,7 @@ func (c *Company) DisplayName() string {
 
 func (c *Company) HasResend() bool { return len(c.ResendKey) > 0 && c.EmailFrom != "" }
 func (c *Company) HasStripe() bool { return len(c.StripeKey) > 0 }
-func (c *Company) HasBank() bool   { return c.IBAN != "" || c.BankExtra != "" }
+func (c *Company) HasBank() bool   { return c.BankCount > 0 }
 
 // ReminderOffsets parses "-3,0,7" into day offsets relative to the due date.
 func (c *Company) ReminderOffsets() []int {
@@ -70,7 +71,8 @@ func (c *Company) ReminderOffsets() []int {
 const companyCols = `id, public_id, name, legal_name, address, email, phone, website, tax_id, registration_id, logo, accent_color,
 	default_currency, default_lang, default_tax_bp, invoice_prefix, payment_terms_days, bank_holder, bank_name, iban, bic,
 	bank_extra, default_notes, footer, resend_key, email_from, email_reply_to, email_bcc, stripe_key, stripe_webhook_secret,
-	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at, email_bank_details`
+	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at, email_bank_details,
+	(SELECT COUNT(*) FROM bank_accounts b WHERE b.company_id = companies.id)`
 
 func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 	c := &Company{}
@@ -78,7 +80,7 @@ func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 		&c.RegistrationID, &c.Logo, &c.AccentColor, &c.DefaultCurrency, &c.DefaultLang, &c.DefaultTaxBP, &c.InvoicePrefix,
 		&c.PaymentTermsDays, &c.BankHolder, &c.BankName, &c.IBAN, &c.BIC, &c.BankExtra, &c.DefaultNotes, &c.Footer,
 		&c.ResendKey, &c.EmailFrom, &c.EmailReplyTo, &c.EmailBCC, &c.StripeKey, &c.StripeWebhookSecret, &c.StripeWebhookID,
-		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.EmailBankDetails)
+		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.EmailBankDetails, &c.BankCount)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -178,9 +180,8 @@ func (s *Store) UpdateCompanyInvoicing(c *Company) error {
 	return err
 }
 
-func (s *Store) UpdateCompanyBank(c *Company) error {
-	_, err := s.DB.Exec(`UPDATE companies SET bank_holder=?, bank_name=?, iban=?, bic=?, bank_extra=?, email_bank_details=? WHERE id=?`,
-		c.BankHolder, c.BankName, c.IBAN, c.BIC, c.BankExtra, b2i(c.EmailBankDetails), c.ID)
+func (s *Store) SetEmailBankDetails(companyID int64, on bool) error {
+	_, err := s.DB.Exec(`UPDATE companies SET email_bank_details = ? WHERE id = ?`, b2i(on), companyID)
 	return err
 }
 

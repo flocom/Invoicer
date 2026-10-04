@@ -18,6 +18,7 @@ func (s *Server) recurringList(c *Ctx) error {
 }
 
 type recurringFormData struct {
+	Banks    []*store.BankAccount
 	R        *store.Recurring
 	Clients  []*store.Client
 	IsNew    bool
@@ -33,6 +34,7 @@ func (s *Server) recurringForm(c *Ctx) error {
 	}
 	co := c.Company
 	d := &recurringFormData{Clients: clients, CanSend: co.HasResend()}
+	d.Banks, _ = s.Store.BankAccounts(co.ID)
 	if id := c.id("id"); id != 0 {
 		r, err := s.Store.Recurring(co.ID, id)
 		if err != nil {
@@ -111,6 +113,7 @@ func (s *Server) recurringSave(c *Ctx) error {
 	r.DueDays, _ = strconv.Atoi(c.form("due_days"))
 	r.AutoSend = c.form("auto_send") == "1"
 	r.Notes = clip(c.form("notes"), 4000)
+	r.BankAccountID = s.bankChoice(c)
 	if v := c.form("remaining"); v == "" {
 		r.Remaining = -1
 	} else if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -125,7 +128,8 @@ func (s *Server) recurringSave(c *Ctx) error {
 		if len(r.Lines) == 0 {
 			r.Lines = []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}
 		}
-		p := s.page(c, c.t("recurring.new"), "recurring", &recurringFormData{R: r, Clients: clients, IsNew: isNew, CanSend: co.HasResend()})
+		banks, _ := s.Store.BankAccounts(co.ID)
+		p := s.page(c, c.t("recurring.new"), "recurring", &recurringFormData{R: r, Clients: clients, IsNew: isNew, CanSend: co.HasResend(), Banks: banks})
 		p.Error = c.t(key)
 		return s.render(c, 400, "recurring_form", p)
 	}

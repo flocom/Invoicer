@@ -17,9 +17,9 @@ func sample(lang, status string) Input {
 	inv := &store.Invoice{ID: 1, Number: "AC-2026-0001", Status: status, Currency: "EUR", Lang: lang, IssueDate: "2026-10-04",
 		DueDate: "2026-11-03", Subtotal: sub, TaxTotal: tax, Total: total, AmountPaid: 20000, Lines: lines,
 		Notes: "Merci pour votre confiance.", UpdatedAt: 1791115000}
-	co := &store.Company{Name: "Acme Studio", AccentColor: "#4338ca", IBAN: "FR7630006000011234567890189", BIC: "AGRIFRPP",
-		BankName: "Crédit Agricole", Footer: "Acme Studio SAS — capital 10 000 € — RCS Paris 123 456 789\nIndemnité forfaitaire pour frais de recouvrement : 40 €"}
+	co := &store.Company{Name: "Acme Studio", AccentColor: "#4338ca", Footer: "Acme Studio SAS — capital 10 000 € — RCS Paris 123 456 789\nIndemnité forfaitaire pour frais de recouvrement : 40 €"}
 	return Input{Invoice: inv, Company: co, PayURL: "https://invoices.example.com/pay/abc",
+		Bank:   &store.BankAccount{Currency: "EUR", IBAN: "FR7630006000011234567890189", BIC: "AGRIFRPP", BankName: "Crédit Agricole"},
 		Seller: store.Party{Name: "Acme Studio SAS", Address: "12 rue de la Paix\n75002 Paris", Email: "billing@acme.test", TaxID: "FR12345678901", RegistrationID: "123 456 789 00012"},
 		Buyer:  store.Party{Name: "Client SARL", ContactName: "Marie Dupont", Address: "1 place Bellecour\n69002 Lyon", TaxID: "FR98765432109"}}
 }

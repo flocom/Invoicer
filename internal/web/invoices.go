@@ -101,6 +101,7 @@ func (s *Server) invoiceList(c *Ctx) error {
 // ---------- form ----------
 
 type invoiceFormData struct {
+	Banks     []*store.BankAccount
 	Invoice   *store.Invoice
 	Clients   []*store.Client
 	IsNew     bool
@@ -115,6 +116,7 @@ func (s *Server) invoiceForm(c *Ctx) error {
 	}
 	co := c.Company
 	d := &invoiceFormData{Clients: clients, CanSend: co.HasResend(), DefaultBP: co.DefaultTaxBP}
+	d.Banks, _ = s.Store.BankAccounts(co.ID)
 	if id := c.id("id"); id != 0 {
 		inv, err := s.Store.Invoice(co.ID, id)
 		if err != nil {
@@ -222,6 +224,7 @@ func (s *Server) invoiceSave(c *Ctx) error {
 	inv.DueDate = c.form("due_date")
 	inv.Notes = clip(c.form("notes"), 4000)
 	inv.RemindersEnabled = c.form("reminders") == "1"
+	inv.BankAccountID = s.bankChoice(c)
 	lines, lerr := parseLines(c)
 	if lines != nil {
 		inv.Lines = lines
@@ -229,6 +232,7 @@ func (s *Server) invoiceSave(c *Ctx) error {
 	fail := func(key string) error {
 		clients, _ := s.Store.Clients(co.ID, false, "")
 		d := &invoiceFormData{Invoice: inv, Clients: clients, IsNew: isNew, CanSend: co.HasResend(), DefaultBP: co.DefaultTaxBP}
+		d.Banks, _ = s.Store.BankAccounts(co.ID)
 		if len(inv.Lines) == 0 {
 			inv.Lines = []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}
 		}
@@ -278,7 +282,9 @@ func (s *Server) invoiceView(c *Ctx) error {
 	if inv.Status == store.StatusDraft && cl != nil {
 		buyer = store.Party{Name: cl.Name, ContactName: cl.ContactName, Address: cl.Address, Email: cl.Email, TaxID: cl.TaxID}
 	}
+	banks, _ := s.Store.BankAccounts(c.Company.ID)
 	return s.render(c, 200, "invoice_view", s.page(c, inv.Title(), "invoices", map[string]any{
+		"Banks": banks, "Bank": s.Store.ResolveBank(c.Company.ID, inv.BankAccountID, inv.Currency),
 		"Invoice": inv, "Client": cl, "Buyer": buyer, "Payments": payments, "Emails": emails,
 		"TaxGroups": store.TaxGroups(inv.Lines), "PublicURL": s.App.PublicURL(inv), "CanSend": c.Company.HasResend(),
 		"HasStripe": c.Company.HasStripe(),
@@ -327,8 +333,37 @@ func (s *Server) doIssue(c *Ctx, id int64) error {
 
 func (s *Server) invoiceIssue(c *Ctx) error { return s.doIssue(c, c.id("id")) }
 
-// bankChoice reads the "include bank details" checkbox of a send form.
-func bankChoice(c *Ctx) *bool {
+// bankChoice reads a bank account select: "auto", "none" or an account id of
+// the current company.
+func (s *Server) bankChoice(c *Ctx) int64 {
+	switch v := c.form("bank_account"); v {
+	case "", "auto":
+		return store.BankAuto
+	case "none":
+		return store.BankNone
+	default:
+		id, _ := strconv.ParseInt(v, 10, 64)
+		if _, err := s.Store.BankAccount(c.Company.ID, id); err == nil {
+			return id
+		}
+		return store.BankAuto
+	}
+}
+
+func (s *Server) invoiceSetBank(c *Ctx) error {
+	inv, err := s.loadInvoice(c)
+	if err != nil {
+		return err
+	}
+	if err := s.Store.SetInvoiceBank(c.Company.ID, inv.ID, s.bankChoice(c)); err != nil {
+		return err
+	}
+	c.ok("flash.saved")
+	return c.redirect(c.cpath("/invoices/%d", inv.ID))
+}
+
+// sendBank reads the "include bank details" checkbox of a send form.
+func sendBank(c *Ctx) *bool {
 	if c.R.PostForm.Get("bank_present") == "" {
 		return nil // form without the checkbox: company default
 	}
@@ -347,7 +382,7 @@ func (s *Server) doSend(c *Ctx, id int64, message string) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, "", bankChoice(c)); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, "", sendBank(c)); err != nil {
 		if errors.Is(err, app.ErrNoEmail) {
 			c.bad("err.no_email_config")
 		} else if errors.Is(err, app.ErrNoRecipient) {
@@ -385,7 +420,7 @@ func (s *Server) invoiceRemind(c *Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, "", bankChoice(c)); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, "", sendBank(c)); err != nil {
 		c.flash("err", err.Error())
 	} else {
 		c.audit("invoice.reminder", inv.Number)
@@ -536,7 +571,7 @@ func (s *Server) invoiceDuplicate(c *Ctx) error {
 	due, _ := time.Parse("2006-01-02", today)
 	inv := &store.Invoice{CompanyID: c.Company.ID, ClientID: src.ClientID, Currency: src.Currency, Lang: src.Lang, IssueDate: today,
 		DueDate: due.AddDate(0, 0, c.Company.PaymentTermsDays).Format("2006-01-02"), Notes: src.Notes,
-		PublicToken: security.Token(24), RemindersEnabled: true}
+		PublicToken: security.Token(24), RemindersEnabled: true, BankAccountID: src.BankAccountID}
 	for _, l := range src.Lines {
 		l.ID = 0
 		inv.Lines = append(inv.Lines, l)

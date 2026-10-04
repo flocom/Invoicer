@@ -18,7 +18,8 @@ func TestCopyClientSuggestionsBankAndDestroy(t *testing.T) {
 	e.app.SaveAddressConfig(false, "off", "", false) // no network in tests
 	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
 	b.post("/companies/new", url.Values{"name": {"Beta"}, "currency": {"CHF"}, "lang": {"en"}})
-	b.post("/c/1/settings/bank", url.Values{"iban": {"CH9300762011623852957"}, "bic": {"POFICHBEXXX"}, "email_bank_details": {"1"}})
+	b.post("/c/1/settings/bank/accounts", url.Values{"currency": {"EUR"}, "label": {"Main"}, "iban": {"CH9300762011623852957"}, "bic": {"POFICHBEXXX"}})
+	b.post("/c/1/settings/bank", url.Values{"email_bank_details": {"1"}})
 	b.post("/c/1/clients/new", url.Values{"name": {"Globex"}, "email": {"ap@globex.test"}, "lang": {"fr"}})
 	today := e.app.Today()
 	due := time.Now().AddDate(0, 0, 30).Format("2006-01-02")
@@ -61,7 +62,7 @@ func TestCopyClientSuggestionsBankAndDestroy(t *testing.T) {
 	// bank details are rendered in the e-mail content
 	co, _ := e.app.Store.Company(1)
 	inv, _ := e.app.Store.Invoice(1, 1)
-	lines := app.BankLines(co, inv, "fr")
+	lines := app.BankLines(e.app.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency), co, inv, "fr")
 	if len(lines) == 0 || lines[len(lines)-1][1] != inv.Number {
 		t.Fatalf("bank lines: %v", lines)
 	}

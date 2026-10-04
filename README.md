@@ -66,6 +66,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 **Getting paid**
 - Public invoice page with **Pay by card** (Stripe Checkout)
 - Stripe webhook set up automatically — no copy-pasting secrets
+- Several bank accounts per company (one per currency or more); each invoice shows the account in its currency, or the one you pick, or none
 - Bank transfer details + **SEPA QR code** on EUR invoices, optionally included in e-mails
 - Automatic receipts, overdue tracking, dashboards
 

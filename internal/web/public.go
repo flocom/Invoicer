@@ -43,6 +43,7 @@ func (s *Server) publicInvoice(c *Ctx) error {
 	p := s.page(c, i18n.T(c.Lang, "pdf.invoice")+" "+inv.Number, "", map[string]any{
 		"Invoice": inv, "Co": co, "Seller": inv.Seller(), "Buyer": inv.Buyer(), "TaxGroups": store.TaxGroups(inv.Lines),
 		"CanPay": co.HasStripe() && inv.Status == store.StatusOpen && inv.Due() > 0,
+		"Bank":   s.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency),
 		"Paid":   c.R.URL.Query().Get("paid") == "1", "Token": inv.PublicToken, "HasLogo": len(co.Logo) > 0,
 	})
 	p.Bare = true
