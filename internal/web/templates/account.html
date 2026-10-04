@@ -1,0 +1,65 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head"><div><h1>{{.T "account.title"}}</h1><p class="muted">{{.User.Email}} · {{.TS "role." .User.Role}}</p></div></div>
+<div class="settings-grid">
+  <div class="stack">
+    <form method="post" action="/account/profile" class="card stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h2>{{.T "account.profile"}}</h2>
+      <div class="field"><label for="name">{{.T "field.name"}}</label><input id="name" name="name" required maxlength="120" value="{{.User.Name}}"></div>
+      <div class="field"><label for="lang">{{.T "field.ui_language"}}</label>
+        <select id="lang" name="lang">{{range langs}}<option value="{{.}}" {{if eq . $.User.Lang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select></div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+    </form>
+    <form method="post" action="/account/password" class="card stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h2>{{.T "account.password"}}</h2>
+      <input type="text" name="username" value="{{.User.Email}}" autocomplete="username" hidden>
+      <div class="field"><label for="current">{{.T "field.current_password"}}</label><input id="current" name="current" type="password" required autocomplete="current-password"></div>
+      <div class="grid-2">
+        <div class="field"><label for="password">{{.T "field.new_password"}}</label><input id="password" name="password" type="password" required minlength="12" autocomplete="new-password"></div>
+        <div class="field"><label for="password2">{{.T "field.password_confirm"}}</label><input id="password2" name="password2" type="password" required minlength="12" autocomplete="new-password"></div>
+      </div>
+      <p class="hint">{{.T "field.password_hint"}}</p>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "account.change_password"}}</button></div>
+    </form>
+  </div>
+  <div class="stack">
+    <div class="card stack">
+      <h2>{{.T "account.2fa"}}</h2>
+      {{if $d.RecoveryCodes}}
+        <div class="note ok">{{.T "account.recovery_save"}}</div>
+        <ul class="codes mono">{{range $d.RecoveryCodes}}<li>{{.}}</li>{{end}}</ul>
+        <button type="button" class="btn btn-sm" data-copy="{{join $d.RecoveryCodes "\n"}}">{{template "icon" "copy"}}{{.T "action.copy"}}</button>
+      {{else if .User.TOTPEnabled}}
+        <p class="status-line ok">{{template "icon" "check"}}{{.T "account.2fa_on"}}</p>
+        <p class="hint">{{.T "account.recovery_left" $d.RecoveryLeft}}</p>
+        <form method="post" action="/account/2fa/disable" class="stack" data-confirm="{{.T "account.2fa_disable_confirm"}}">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <div class="field"><label for="cur2">{{.T "field.current_password"}}</label><input id="cur2" name="current" type="password" required autocomplete="current-password"></div>
+          <button class="btn btn-danger-ghost" type="submit">{{.T "account.2fa_disable"}}</button>
+        </form>
+      {{else if $d.TOTPSetup}}
+        <ol class="steps"><li>{{.T "account.2fa_step1"}}</li><li>{{.T "account.2fa_step2"}}</li></ol>
+        {{if $d.TOTPQR}}<img class="qr" src="{{datauri "image/png" $d.TOTPQR}}" alt="QR code" width="200" height="200">{{end}}
+        <p class="hint">{{.T "account.2fa_manual"}} <code class="mono break">{{$d.TOTPSecret}}</code></p>
+        <form method="post" action="/account/2fa/enable" class="row">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <input name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" class="mono code-input" aria-label="{{.T "mfa.code"}}">
+          <button class="btn btn-primary" type="submit">{{.T "account.2fa_activate"}}</button>
+        </form>
+      {{else}}
+        <p class="hint">{{.T "account.2fa_intro"}}</p>
+        {{if .User.IsOwner}}<p class="note warn">{{.T "account.2fa_owner_tip"}}</p>{{end}}
+        <form method="post" action="/account/2fa/start"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-primary" type="submit">{{template "icon" "shield"}}{{.T "account.2fa_enable"}}</button></form>
+      {{end}}
+    </div>
+    <form method="post" action="/account/sessions/revoke" class="card stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h2>{{.T "account.sessions"}}</h2>
+      <p class="hint">{{.T "account.sessions_hint"}}</p>
+      <button class="btn" type="submit">{{.T "account.revoke_sessions"}}</button>
+    </form>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,26 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head">
+  <div><h1>{{.T "nav.invoices"}}</h1></div>
+  <div class="actions"><a class="btn btn-primary" href="{{.CPath "/invoices/new"}}">{{template "icon" "plus"}}{{.T "invoice.new"}}</a></div>
+</div>
+<div class="toolbar">
+  <nav class="pills">
+    {{range $d.Statuses}}<a href="?status={{.}}{{if $d.Q}}&amp;q={{$d.Q}}{{end}}" class="{{if eq . $d.Status}}active{{end}}">{{if .}}{{$.TS "status." .}}{{else}}{{$.T "status.all"}}{{end}}</a>{{end}}
+  </nav>
+  <form method="get" class="search">
+    <input type="hidden" name="status" value="{{$d.Status}}">
+    <input type="search" name="q" value="{{$d.Q}}" placeholder="{{.T "invoice.search_ph"}}" aria-label="{{.T "action.search"}}">
+  </form>
+</div>
+{{if $d.Invoices}}
+<div class="card flush">{{template "invoice_table" (dict "P" $ "Invoices" $d.Invoices)}}</div>
+<div class="pager">
+  {{if gt $d.Page 1}}<a class="btn btn-sm" href="?status={{$d.Status}}&amp;q={{$d.Q}}&amp;page={{add $d.Page -1}}">← {{.T "action.previous"}}</a>{{end}}
+  <span class="muted small">{{.T "invoice.count" $d.Total}}</span>
+  {{if $d.HasNext}}<a class="btn btn-sm" href="?status={{$d.Status}}&amp;q={{$d.Q}}&amp;page={{add $d.Page 1}}">{{.T "action.next"}} →</a>{{end}}
+</div>
+{{else}}
+<div class="empty big">{{template "icon" "file"}}<h2>{{.T "invoice.empty_title"}}</h2><p class="muted">{{.T "invoice.empty_body"}}</p><a class="btn btn-primary" href="{{.CPath "/invoices/new"}}">{{.T "invoice.new"}}</a></div>
+{{end}}
+{{end}}

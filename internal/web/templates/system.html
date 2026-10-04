@@ -1,0 +1,58 @@
+{{define "content"}}
+{{$d := .Data}}{{$u := $d.Update}}
+<div class="page-head"><div><h1>{{.T "system.title"}}</h1><p class="muted">Invoicer {{.Version}}</p></div></div>
+<div class="settings-grid">
+  <div class="stack">
+    <div class="card stack">
+      <h2>{{.T "system.updates"}}</h2>
+      {{if not $u.Enabled}}
+        <p class="note">{{.T "system.updates_disabled"}}</p>
+      {{else}}
+        <dl class="kv">
+          <dt>{{.T "system.current"}}</dt><dd class="mono">{{$u.Current}}</dd>
+          <dt>{{.T "system.latest"}}</dt><dd class="mono">{{if $u.Latest}}{{$u.Latest}}{{else}}–{{end}}</dd>
+          <dt>{{.T "system.last_check"}}</dt><dd>{{if not $u.LastCheck.IsZero}}{{.DateTime $u.LastCheck.Unix}}{{else}}–{{end}}</dd>
+          <dt>{{.T "system.auto_install"}}</dt><dd>{{if $u.AutoInstall}}{{.T "system.on"}}{{else}}{{.T "system.off"}}{{end}}</dd>
+          <dt>{{.T "system.state"}}</dt><dd>{{.TS "update_state." $u.State}}</dd>
+        </dl>
+        {{if $u.LastError}}<p class="note warn">{{$u.LastError}}</p>{{end}}
+        {{if $u.Required}}<p class="note warn">{{.T "banner.update_required"}}</p>{{end}}
+        {{if $u.Available}}<div class="note ok"><strong>{{.T "system.update_available" $u.Latest}}</strong>{{if $u.Notes}}<p class="pre small">{{$u.Notes}}</p>{{end}}</div>{{end}}
+        <div class="row wrap">
+          <form method="post" action="/admin/system/update-check"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "system.check_now"}}</button></form>
+          {{if $u.Available}}<form method="post" action="/admin/system/update-install" data-confirm="{{.T "system.install_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-primary" type="submit">{{.T "system.install_now" $u.Latest}}</button></form>{{end}}
+        </div>
+        <p class="hint">{{.T "system.updates_hint"}}</p>
+      {{end}}
+    </div>
+    <div class="card stack">
+      <h2>{{.T "system.public_url"}}</h2>
+      <dl class="kv">
+        <dt>{{.T "system.saved_url"}}</dt><dd class="mono break">{{if .BaseURL}}{{.BaseURL}}{{else}}–{{end}}</dd>
+        <dt>{{.T "system.detected_url"}}</dt><dd class="mono break">{{$d.DetectedO}}</dd>
+        <dt>Stripe webhooks</dt><dd>{{if $d.PublicTLS}}{{.T "system.webhooks_possible"}}{{else}}{{.T "system.webhooks_polling"}}{{end}}</dd>
+      </dl>
+      {{if ne $d.DetectedO .BaseURL}}
+      <form method="post" action="/admin/system/domain"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="back" value="/admin/system"><button class="btn" type="submit">{{.T "banner.use_origin"}}</button></form>
+      {{end}}
+      <p class="hint">{{.T "system.public_url_hint"}}</p>
+    </div>
+  </div>
+  <div class="stack">
+    <form method="post" action="/admin/system" class="card stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h2>{{.T "system.general"}}</h2>
+      <div class="field"><label for="timezone">{{.T "system.timezone"}}</label>
+        <select id="timezone" name="timezone">{{range $d.Zones}}<option {{if eq . $d.Timezone}}selected{{end}}>{{.}}</option>{{end}}</select>
+        <p class="hint">{{.T "system.timezone_hint"}}</p></div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+    </form>
+    <div class="card stack">
+      <h2>{{.T "system.backups"}}</h2>
+      <p class="hint">{{.T "system.backups_hint" $d.DataDir}}</p>
+      <form method="post" action="/admin/system/backup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "system.backup_now"}}</button></form>
+      {{if $d.Backups}}<ul class="list small">{{range $d.Backups}}<li><span class="mono">{{.Name}}</span><span class="muted">{{bytes .Size}}</span></li>{{end}}</ul>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}

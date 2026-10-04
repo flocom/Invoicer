@@ -1,0 +1,7 @@
+.git
+.devdata
+.claude
+dist
+*.db
+*.md
+!README.md

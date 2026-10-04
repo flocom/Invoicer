@@ -1,0 +1,78 @@
+{{define "content"}}
+{{$d := .Data}}{{$r := $d.R}}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{.CPath "/recurring"}}">← {{.T "nav.recurring"}}</a>
+    <h1>{{if $d.IsNew}}{{.T "recurring.new"}}{{else}}{{$r.Name}} {{if $r.Active}}<span class="badge badge-paid">{{.T "recurring.active"}}</span>{{else}}<span class="badge badge-void">{{.T "recurring.paused"}}</span>{{end}}{{end}}</h1>
+  </div>
+  {{if not $d.IsNew}}
+  <div class="actions">
+    {{if $r.Active}}<form method="post" action="{{.CPath "/recurring/%d/run" $r.ID}}" data-confirm="{{.T "recurring.run_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "recurring.run_now"}}</button></form>{{end}}
+    <form method="post" action="{{.CPath "/recurring/%d/toggle" $r.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{if $r.Active}}{{.T "recurring.pause"}}{{else}}{{.T "recurring.resume"}}{{end}}</button></form>
+  </div>
+  {{end}}
+</div>
+{{if not $d.Clients}}
+<div class="empty big">{{template "icon" "users"}}<h2>{{.T "invoice.need_client"}}</h2><a class="btn btn-primary" href="{{.CPath "/clients/new"}}">{{.T "client.new"}}</a></div>
+{{else}}
+{{if $r.LastError}}<div class="flash flash-err">{{.T "recurring.last_error"}} {{$r.LastError}}</div>{{end}}
+<form method="post" class="invoice-editor stack" data-invoice-form>
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <div class="card stack">
+    <div class="grid-4">
+      <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}"></div>
+      <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
+        <select id="client_id" name="client_id" required data-client-select>
+          <option value="">{{.T "invoice.choose_client"}}</option>
+          {{range $d.Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $r.ClientID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+        <p class="hint">{{.T "recurring.lang_hint"}}</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <div class="field"><label for="interval_count">{{.T "recurring.every"}}</label>
+        <div class="row">
+          <input id="interval_count" name="interval_count" type="number" min="1" max="36" value="{{$r.IntervalCount}}" class="w-num">
+          <select name="interval_unit" aria-label="{{.T "recurring.frequency"}}">
+            <option value="week" {{if eq $r.IntervalUnit "week"}}selected{{end}}>{{.T "unit.weeks"}}</option>
+            <option value="month" {{if eq $r.IntervalUnit "month"}}selected{{end}}>{{.T "unit.months"}}</option>
+            <option value="year" {{if eq $r.IntervalUnit "year"}}selected{{end}}>{{.T "unit.years"}}</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label for="next_run">{{if $d.IsNew}}{{.T "recurring.first_run"}}{{else}}{{.T "recurring.next_run"}}{{end}}</label><input id="next_run" name="next_run" type="date" required value="{{$r.NextRun}}"></div>
+      <div class="field"><label for="due_days">{{.T "field.payment_terms"}}</label><span class="suffix-input"><input id="due_days" name="due_days" type="number" min="0" max="365" value="{{$r.DueDays}}"><span>{{.T "unit.days"}}</span></span></div>
+      <div class="field"><label for="currency">{{.T "field.currency"}}</label>
+        <select id="currency" name="currency" data-currency-select>{{range currencies}}<option {{if eq . $r.Currency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
+    </div>
+    <div class="grid-4">
+      <div class="field"><label for="end_date">{{.T "recurring.end_date"}}</label><input id="end_date" name="end_date" type="date" value="{{$r.EndDate}}"><p class="hint">{{.T "recurring.optional"}}</p></div>
+      <div class="field"><label for="remaining">{{.T "recurring.remaining"}}</label><input id="remaining" name="remaining" type="number" min="0" value="{{if ge $r.Remaining 0}}{{$r.Remaining}}{{end}}" placeholder="∞"><p class="hint">{{.T "recurring.remaining_hint"}}</p></div>
+      <div class="field span-2 align-end">
+        <label class="check"><input type="checkbox" name="auto_send" value="1" {{if $r.AutoSend}}checked{{end}} {{if not $d.CanSend}}disabled{{end}}> {{.T "recurring.auto_send"}}</label>
+        {{if not $d.CanSend}}<p class="hint">{{.T "recurring.auto_send_needs_email"}}</p>{{end}}
+      </div>
+    </div>
+    {{if $d.Preview}}<p class="hint">{{.T "recurring.preview"}} {{range $i, $p := $d.Preview}}{{if $i}}, {{end}}{{$.Date $p}}{{end}}…</p>{{end}}
+  </div>
+
+  <div class="card">{{template "lines" (dict "P" $ "Lines" $r.Lines "Currency" $r.Currency "DefaultBP" .Company.DefaultTaxBP)}}</div>
+
+  <div class="card stack">
+    <div class="field"><label for="notes">{{.T "invoice.notes"}}</label><textarea id="notes" name="notes" rows="3" maxlength="4000">{{$r.Notes}}</textarea></div>
+  </div>
+  <div class="form-actions sticky-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+</form>
+
+{{if not $d.IsNew}}
+<section class="card flush">
+  <div class="card-head pad"><h2>{{.T "recurring.generated"}}</h2></div>
+  {{if $d.Invoices}}{{template "invoice_table" (dict "P" $ "Invoices" $d.Invoices)}}{{else}}<p class="empty-inline pad">{{.T "recurring.none_yet"}}</p>{{end}}
+</section>
+<form method="post" action="{{.CPath "/recurring/%d/delete" $r.ID}}" class="danger-zone" data-confirm="{{.T "recurring.delete_confirm"}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <button class="btn btn-danger-ghost btn-sm" type="submit">{{template "icon" "trash"}}{{.T "recurring.delete"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}

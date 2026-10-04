@@ -1,0 +1,32 @@
+# Invoicer — everything runs in this single container (web app, database,
+# background jobs, automatic updates). No configuration is required.
+#
+#   docker compose up -d
+#   docker compose logs invoicer     # shows the one-time setup token
+#
+services:
+  invoicer:
+    image: ghcr.io/flocom/invoicer:latest
+    container_name: invoicer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"          # put your reverse proxy (Caddy, Traefik, Nginx, Cloudflare Tunnel…) in front
+      # With TLS=auto (built-in Let's Encrypt), use these instead:
+      # - "80:8080"
+      # - "443:8443"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - invoicer-data:/data
+    # hardening
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 512m
+    pids_limit: 200
+
+volumes:
+  invoicer-data:

@@ -1,0 +1,87 @@
+{{define "content"}}
+{{$d := .Data}}{{$st := $d.Stats}}
+<div class="page-head">
+  <div><h1>{{.Company.Name}}</h1><p class="muted">{{.Date .Today}}</p></div>
+  <div class="actions">
+    <a class="btn" href="{{.CPath "/clients/new"}}">{{template "icon" "plus"}}{{.T "client.new"}}</a>
+    <a class="btn btn-primary" href="{{.CPath "/invoices/new"}}">{{template "icon" "plus"}}{{.T "invoice.new"}}</a>
+  </div>
+</div>
+
+{{if not $d.SetupDone}}
+<div class="card setup-card">
+  <h2>{{.T "dash.getting_started"}}</h2>
+  <ol class="checklist">
+    <li class="{{if index $d.Setup "details"}}done{{end}}">{{template "icon" "check"}}<a href="{{.CPath "/settings?tab=general"}}">{{.T "dash.step_details"}}</a></li>
+    <li class="{{if index $d.Setup "payment"}}done{{end}}">{{template "icon" "check"}}<a href="{{.CPath "/settings?tab=payments"}}">{{.T "dash.step_payment"}}</a></li>
+    <li class="{{if index $d.Setup "email"}}done{{end}}">{{template "icon" "check"}}<a href="{{.CPath "/settings?tab=email"}}">{{.T "dash.step_email"}}</a></li>
+    <li class="{{if index $d.Setup "client"}}done{{end}}">{{template "icon" "check"}}<a href="{{.CPath "/clients/new"}}">{{.T "dash.step_client"}}</a></li>
+  </ol>
+</div>
+{{end}}
+
+<div class="stats">
+  <a class="card stat" href="{{.CPath "/invoices?status=open"}}">
+    <span class="stat-label">{{.T "dash.outstanding"}}</span>
+    {{range .Totals $st.Outstanding}}<span class="stat-value">{{.}}</span>{{else}}<span class="stat-value">–</span>{{end}}
+    <span class="stat-sub">{{.T "dash.open_count" $st.OpenCount}}</span>
+  </a>
+  <a class="card stat {{if $st.OverdueN}}stat-danger{{end}}" href="{{.CPath "/invoices?status=overdue"}}">
+    <span class="stat-label">{{.T "dash.overdue"}}</span>
+    {{range .Totals $st.Overdue}}<span class="stat-value">{{.}}</span>{{else}}<span class="stat-value">–</span>{{end}}
+    <span class="stat-sub">{{.T "dash.overdue_count" $st.OverdueN}}</span>
+  </a>
+  <div class="card stat">
+    <span class="stat-label">{{.T "dash.paid_month"}}</span>
+    {{range .Totals $st.PaidMonth}}<span class="stat-value">{{.}}</span>{{else}}<span class="stat-value">–</span>{{end}}
+    <span class="stat-sub">{{.T "dash.paid_year"}} {{range .Totals $st.PaidYear}}{{.}} {{else}}–{{end}}</span>
+  </div>
+  <a class="card stat" href="{{.CPath "/invoices?status=draft"}}">
+    <span class="stat-label">{{.T "dash.drafts"}}</span>
+    <span class="stat-value">{{$st.Drafts}}</span>
+    <span class="stat-sub">{{.T "dash.drafts_sub"}}</span>
+  </a>
+</div>
+
+<div class="dash-grid">
+  <section class="card">
+    <div class="card-head"><h2>{{.T "dash.collected"}} · {{.Company.DefaultCurrency}}</h2></div>
+    <div class="chart" role="img" aria-label="{{.T "dash.collected"}}">
+      {{range $d.Chart}}
+      <div class="chart-col" title="{{$.Money .Amount $.Company.DefaultCurrency}}">
+        <svg viewBox="0 0 10 100" preserveAspectRatio="none" class="chart-bar" aria-hidden="true"><rect x="0" y="{{sub100 .Pct}}" width="10" height="{{.Pct}}" rx="1.5"/></svg>
+        <span>{{monthShort $.Lang .Label}}</span>
+      </div>
+      {{end}}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>{{.T "dash.overdue_list"}}</h2><a href="{{.CPath "/invoices?status=overdue"}}" class="small">{{.T "action.view_all"}}</a></div>
+    {{if $d.Overdue}}
+    <ul class="list">
+      {{range $d.Overdue}}
+      <li><a href="{{$.CPath "/invoices/%d" .ID}}"><span><strong>{{.Number}}</strong> <span class="muted">{{.ClientName}}</span></span><span class="danger">{{$.Money .Due .Currency}}</span></a></li>
+      {{end}}
+    </ul>
+    {{else}}<p class="empty-inline">{{template "icon" "check"}}{{.T "dash.no_overdue"}}</p>{{end}}
+  </section>
+
+  <section class="card span-2">
+    <div class="card-head"><h2>{{.T "dash.recent"}}</h2><a href="{{.CPath "/invoices"}}" class="small">{{.T "action.view_all"}}</a></div>
+    {{if $d.Recent}}{{template "invoice_table" (dict "P" $ "Invoices" $d.Recent)}}
+    {{else}}<div class="empty"><p>{{.T "dash.no_invoices"}}</p><a class="btn btn-primary" href="{{.CPath "/invoices/new"}}">{{.T "invoice.new"}}</a></div>{{end}}
+  </section>
+
+  {{if $d.Upcoming}}
+  <section class="card span-2">
+    <div class="card-head"><h2>{{.T "dash.upcoming"}}</h2><a href="{{.CPath "/recurring"}}" class="small">{{.T "action.view_all"}}</a></div>
+    <ul class="list">
+      {{range $d.Upcoming}}
+      <li><a href="{{$.CPath "/recurring/%d" .ID}}"><span><strong>{{.Name}}</strong> <span class="muted">{{.ClientName}}</span></span><span>{{$.Date .NextRun}} · {{$.Money .Amount .Currency}}</span></a></li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</div>
+{{end}}

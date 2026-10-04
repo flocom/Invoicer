@@ -1,0 +1,166 @@
+# Every push to main publishes a new version automatically:
+#   - computes the next tag from the last one (first release: v0.1.0)
+#       patch by default, minor if a commit starts with "feat",
+#       major if a commit contains "BREAKING CHANGE" or "#major"
+#   - builds the Linux binaries, signs the update manifest, creates the
+#     GitHub release and pushes the Docker image (vX.Y.Z + latest)
+# Commit message keywords:
+#   [skip release]   do not publish for this push
+#   [critical]       every instance installs this release immediately
+#   [min:vX.Y.Z]     instances older than vX.Y.Z update immediately
+# A release can also be started by hand (Actions → Release → Run workflow).
+name: Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      min_version:
+        description: "Minimum version allowed to keep running (forces update below it)"
+        required: false
+      critical:
+        description: "Critical release: install immediately everywhere"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+
+      - name: Compute version
+        id: v
+        env:
+          BUMP: ${{ inputs.bump || 'auto' }}
+          IN_MIN: ${{ inputs.min_version }}
+          IN_CRIT: ${{ inputs.critical }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          git fetch --tags --force
+          LAST=$(git tag -l 'v*.*.*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -n "$LAST" ]; then
+            if [ -z "$(git log "$LAST..HEAD" --format=%H)" ]; then
+              echo "No new commits since $LAST"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            MSGS=$(git log "$LAST..HEAD" --format=%B)
+          else
+            MSGS=$(git log --format=%B)
+          fi
+          if [ "$EVENT" = "push" ] && echo "$(git log -1 --format=%B)" | grep -qi '\[skip release\]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$LAST" ]; then
+            NEXT=v0.1.0
+          else
+            IFS=. read -r MA MI PA <<< "${LAST#v}"
+            if [ "$BUMP" = auto ]; then
+              if echo "$MSGS" | grep -qE 'BREAKING CHANGE|#major'; then BUMP=major
+              elif echo "$MSGS" | grep -qE '^feat(\(.+\))?!?:'; then BUMP=minor
+              else BUMP=patch; fi
+            fi
+            case "$BUMP" in
+              major) NEXT="v$((MA+1)).0.0" ;;
+              minor) NEXT="v$MA.$((MI+1)).0" ;;
+              *)     NEXT="v$MA.$MI.$((PA+1))" ;;
+            esac
+          fi
+          MIN="$IN_MIN"
+          if [ -z "$MIN" ]; then MIN=$(echo "$MSGS" | grep -oE '\[min:v[0-9]+\.[0-9]+\.[0-9]+\]' | head -1 | sed -E 's/\[min:(.*)\]/\1/'); fi
+          CRIT=false
+          if [ "$IN_CRIT" = "true" ] || echo "$MSGS" | grep -qi '\[critical\]'; then CRIT=true; fi
+          NOTES=$(git log -1 --format=%s)
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "min=$MIN" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRIT" >> "$GITHUB_OUTPUT"
+          { echo "notes<<EOF_NOTES"; echo "$NOTES"; echo "EOF_NOTES"; } >> "$GITHUB_OUTPUT"
+          echo "Releasing $NEXT (previous: ${LAST:-none})"
+
+      - name: Test
+        if: steps.v.outputs.skip != 'true'
+        run: go test -count=1 ./...
+
+      - name: Build binaries
+        if: steps.v.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -buildvcs=false \
+              -ldflags="-s -w -X github.com/flocom/invoicer/internal/config.Version=${TAG}" \
+              -o dist/invoicer-linux-$arch ./cmd/invoicer
+          done
+
+      - name: Sign update manifest
+        if: steps.v.outputs.skip != 'true'
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          TAG: ${{ steps.v.outputs.tag }}
+          MIN: ${{ steps.v.outputs.min }}
+          CRIT: ${{ steps.v.outputs.critical }}
+          NOTES: ${{ steps.v.outputs.notes }}
+        run: |
+          ARGS=(-version "$TAG" -dir dist -notes "$NOTES")
+          if [ -n "$MIN" ]; then ARGS+=(-min "$MIN"); fi
+          if [ "$CRIT" = "true" ]; then ARGS+=(-critical); fi
+          go run ./cmd/release manifest "${ARGS[@]}"
+          (cd dist && sha256sum invoicer-linux-* > SHA256SUMS)
+
+      - name: Tag and publish GitHub release
+        if: steps.v.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" dist/* --title "$TAG" --generate-notes --verify-tag
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.v.outputs.skip != 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: steps.v.outputs.skip != 'true'
+      - uses: docker/login-action@v3
+        if: steps.v.outputs.skip != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: img
+        if: steps.v.outputs.skip != 'true'
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        if: steps.v.outputs.skip != 'true'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ steps.v.outputs.tag }}
+          tags: |
+            ${{ steps.img.outputs.name }}:${{ steps.v.outputs.tag }}
+            ${{ steps.img.outputs.name }}:latest
+          provenance: true
+          sbom: true

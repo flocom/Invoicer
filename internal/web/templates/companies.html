@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="page-head">
+  <div><h1>{{.T "nav.companies"}}</h1><p class="muted">{{.T "companies.intro"}}</p></div>
+  {{if .User.IsAdmin}}<div class="actions"><a class="btn btn-primary" href="/companies/new">{{template "icon" "plus"}}{{.T "company.new"}}</a></div>{{end}}
+</div>
+{{if .Data}}
+<div class="cards">
+  {{range .Data}}
+  <a class="card company-card {{if .Archived}}is-archived{{end}}" href="/c/{{.ID}}">
+    <svg class="swatch" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="{{.AccentColor}}"/><text x="20" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">{{initial .Name}}</text></svg>
+    <div>
+      <strong>{{.Name}}</strong>
+      <div class="muted small">{{.DefaultCurrency}} · {{$.TS "lang." .DefaultLang}}{{if .Archived}} · {{$.T "company.archived"}}{{end}}</div>
+      <div class="chips">
+        <span class="chip {{if .HasResend}}on{{end}}">{{$.T "settings.tab_email"}}</span>
+        <span class="chip {{if .HasStripe}}on{{end}}">Stripe</span>
+        <span class="chip {{if .HasBank}}on{{end}}">{{$.T "settings.bank"}}</span>
+      </div>
+    </div>
+  </a>
+  {{end}}
+</div>
+{{else}}
+<div class="empty"><p>{{.T "companies.empty"}}</p></div>
+{{end}}
+{{end}}

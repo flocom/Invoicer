@@ -1,0 +1,83 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head"><div><h1>{{.T "users.title"}}</h1><p class="muted">{{.T "users.intro"}}</p></div></div>
+
+{{if $d.InviteLink}}
+<div class="card callout ok stack">
+  <strong>{{.T "users.invite_link"}}</strong>
+  <div class="copy-field"><input readonly value="{{$d.InviteLink}}"><button type="button" class="icon-btn" data-copy="{{$d.InviteLink}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></div>
+  <p class="hint">{{.T "users.invite_link_hint"}}</p>
+</div>
+{{end}}
+{{if $d.ResetLink}}
+<div class="card callout ok stack">
+  <strong>{{.T "users.reset_link" $d.ResetFor}}</strong>
+  <div class="copy-field"><input readonly value="{{$d.ResetLink}}"><button type="button" class="icon-btn" data-copy="{{$d.ResetLink}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></div>
+  <p class="hint">{{.T "users.reset_link_hint"}}</p>
+</div>
+{{end}}
+
+<div class="settings-grid">
+<div class="card flush">
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>{{.T "field.name"}}</th><th>{{.T "field.role"}}</th><th>{{.T "users.access"}}</th><th></th></tr></thead>
+    <tbody>
+    {{range $u := $d.Users}}
+    <tr class="{{if $u.Disabled}}is-archived{{end}}">
+      <td><strong>{{$u.Name}}</strong>{{if eq $u.ID $.User.ID}} <span class="chip">{{$.T "users.you"}}</span>{{end}}<div class="muted small">{{$u.Email}}</div>
+        <div class="muted small">{{if $u.TOTPEnabled}}2FA ✓{{else}}2FA –{{end}} · {{if $u.LastLoginAt}}{{$.DateTime $u.LastLoginAt}}{{else}}{{$.T "users.never"}}{{end}}</div></td>
+      <td>{{$.TS "role." $u.Role}}{{if $u.Disabled}} · {{$.T "users.disabled"}}{{end}}</td>
+      <td class="small">{{if $u.IsAdmin}}{{$.T "users.all_companies"}}{{else}}{{range $.Data.Companies}}{{if index (index $d.Memberships $u.ID) .ID}}<span class="chip">{{.Name}}</span> {{end}}{{end}}{{end}}</td>
+      <td class="w1">
+        {{if and (ne $u.ID $.User.ID) (not $u.IsOwner) (or $.User.IsOwner (eq $u.Role "member"))}}
+        <details class="menu">
+          <summary class="btn btn-sm">{{$.T "action.manage"}}</summary>
+          <div class="menu-panel stack">
+            <form method="post" action="/admin/users/{{$u.ID}}" class="stack">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}">
+              <div class="field"><label>{{$.T "field.role"}}</label>
+                <select name="role">
+                  <option value="member" {{if eq $u.Role "member"}}selected{{end}}>{{$.TS "role." "member"}}</option>
+                  {{if $.User.IsOwner}}<option value="admin" {{if eq $u.Role "admin"}}selected{{end}}>{{$.TS "role." "admin"}}</option>{{end}}
+                </select></div>
+              <fieldset class="field"><legend>{{$.T "users.companies"}}</legend>
+                {{range $d.Companies}}<label class="check"><input type="checkbox" name="companies" value="{{.ID}}" {{if index (index $d.Memberships $u.ID) .ID}}checked{{end}}> {{.Name}}</label>{{end}}
+                <p class="hint">{{$.T "users.companies_hint"}}</p>
+              </fieldset>
+              <label class="check"><input type="checkbox" name="disabled" value="1" {{if $u.Disabled}}checked{{end}}> {{$.T "users.disable"}}</label>
+              <button class="btn btn-primary btn-sm" type="submit">{{$.T "action.save"}}</button>
+            </form>
+            <form method="post" action="/admin/users/{{$u.ID}}/reset"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{$.T "users.reset_password"}}</button></form>
+            {{if $.User.IsOwner}}
+            <form method="post" action="/admin/users/{{$u.ID}}/transfer" class="stack" data-confirm="{{$.T "users.transfer_confirm" $u.Name}}">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}">
+              <input type="password" name="current" required placeholder="{{$.T "field.current_password"}}" autocomplete="current-password" aria-label="{{$.T "field.current_password"}}">
+              <button class="btn btn-ghost btn-sm btn-block" type="submit">{{$.T "users.transfer"}}</button>
+            </form>
+            {{end}}
+            <form method="post" action="/admin/users/{{$u.ID}}/delete" data-confirm="{{$.T "users.delete_confirm" $u.Name}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{$.T "action.delete"}}</button></form>
+          </div>
+        </details>
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<form method="post" action="/admin/invites" class="card stack">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>{{.T "users.invite"}}</h2>
+  <div class="field"><label for="iemail">{{.T "field.email"}}</label><input id="iemail" name="email" type="email" required maxlength="200"></div>
+  <div class="field"><label for="irole">{{.T "field.role"}}</label>
+    <select id="irole" name="role"><option value="member">{{.TS "role." "member"}}</option>{{if .User.IsOwner}}<option value="admin">{{.TS "role." "admin"}}</option>{{end}}</select>
+    <p class="hint">{{.T "users.roles_hint"}}</p></div>
+  {{if $d.Companies}}<fieldset class="field"><legend>{{.T "users.companies"}}</legend>
+    {{range $d.Companies}}<label class="check"><input type="checkbox" name="companies" value="{{.ID}}"> {{.Name}}</label>{{end}}</fieldset>{{end}}
+  <button class="btn btn-primary" type="submit">{{.T "users.create_invite"}}</button>
+</form>
+</div>
+{{end}}

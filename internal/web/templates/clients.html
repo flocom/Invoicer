@@ -1,0 +1,33 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head">
+  <div><h1>{{.T "nav.clients"}}</h1></div>
+  <div class="actions"><a class="btn btn-primary" href="{{.CPath "/clients/new"}}">{{template "icon" "plus"}}{{.T "client.new"}}</a></div>
+</div>
+<form class="toolbar" method="get">
+  <input type="search" name="q" value="{{$d.Q}}" placeholder="{{.T "action.search"}}" aria-label="{{.T "action.search"}}">
+  <label class="check small"><input type="checkbox" name="archived" value="1" {{if $d.Archived}}checked{{end}} data-autosubmit> {{.T "client.show_archived"}}</label>
+  <button class="btn btn-sm" type="submit">{{.T "action.filter"}}</button>
+</form>
+{{if $d.Clients}}
+<div class="card flush">
+<div class="table-wrap">
+<table class="table table-click">
+  <thead><tr><th>{{.T "field.name"}}</th><th>{{.T "field.email"}}</th><th>{{.T "field.language"}}</th><th class="r">{{.T "client.outstanding"}}</th></tr></thead>
+  <tbody>
+  {{range $d.Clients}}
+  <tr class="{{if .Archived}}is-archived{{end}}">
+    <td><a class="row-link" href="{{$.CPath "/clients/%d" .ID}}"><strong>{{.Name}}</strong></a>{{if .ContactName}}<div class="muted small">{{.ContactName}}</div>{{end}}</td>
+    <td class="muted">{{.Email}}</td>
+    <td><span class="chip">{{upper .Lang}}</span></td>
+    <td class="r">{{range $.Totals .Outstanding}}<div>{{.}}</div>{{else}}<span class="muted">–</span>{{end}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+</div>
+{{else}}
+<div class="empty big">{{template "icon" "users"}}<h2>{{.T "client.empty_title"}}</h2><p class="muted">{{.T "client.empty_body"}}</p><a class="btn btn-primary" href="{{.CPath "/clients/new"}}">{{.T "client.new"}}</a></div>
+{{end}}
+{{end}}

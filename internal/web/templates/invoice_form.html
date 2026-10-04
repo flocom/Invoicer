@@ -1,0 +1,50 @@
+{{define "content"}}
+{{$d := .Data}}{{$inv := $d.Invoice}}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{if $d.IsNew}}{{.CPath "/invoices"}}{{else}}{{.CPath "/invoices/%d" $inv.ID}}{{end}}">← {{.T "action.back"}}</a>
+    <h1>{{if $d.IsNew}}{{.T "invoice.new"}}{{else}}{{.T "invoice.edit_draft"}}{{end}}</h1>
+  </div>
+</div>
+{{if not $d.Clients}}
+<div class="empty big">{{template "icon" "users"}}<h2>{{.T "invoice.need_client"}}</h2><a class="btn btn-primary" href="{{.CPath "/clients/new?next=%s" (.CPath "/invoices/new")}}">{{.T "client.new"}}</a></div>
+{{else}}
+<form method="post" class="invoice-editor stack" data-invoice-form>
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <div class="card stack">
+    <div class="grid-4">
+      <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
+        <div class="row">
+          <select id="client_id" name="client_id" required data-client-select>
+            <option value="">{{.T "invoice.choose_client"}}</option>
+            {{range $d.Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $inv.ClientID}}selected{{end}}>{{.Name}}</option>{{end}}
+          </select>
+          <a class="btn btn-ghost btn-sm nowrap" href="{{.CPath "/clients/new?next=%s" (.CPath "/invoices/new")}}">+ {{.T "client.new_short"}}</a>
+        </div>
+      </div>
+      <div class="field"><label for="currency">{{.T "field.currency"}}</label>
+        <select id="currency" name="currency" data-currency-select>{{range currencies}}<option {{if eq . $inv.Currency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
+      <div class="field"><label for="lang">{{.T "field.doc_language"}}</label>
+        <select id="lang" name="lang" data-lang-select>{{range langs}}<option value="{{.}}" {{if eq . $inv.Lang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select></div>
+    </div>
+    <div class="grid-4">
+      <div class="field"><label for="issue_date">{{.T "invoice.issue_date"}}</label><input id="issue_date" name="issue_date" type="date" required value="{{$inv.IssueDate}}" data-issue-date></div>
+      <div class="field"><label for="due_date">{{.T "invoice.due_date"}}</label><input id="due_date" name="due_date" type="date" required value="{{$inv.DueDate}}" data-due-date data-terms="{{.Company.PaymentTermsDays}}"></div>
+    </div>
+  </div>
+
+  <div class="card">{{template "lines" (dict "P" $ "Lines" $inv.Lines "Currency" $inv.Currency "DefaultBP" $d.DefaultBP)}}</div>
+
+  <div class="card stack">
+    <div class="field"><label for="notes">{{.T "invoice.notes"}}</label><textarea id="notes" name="notes" rows="3" maxlength="4000" placeholder="{{.T "invoice.notes_ph"}}">{{$inv.Notes}}</textarea></div>
+    <label class="check"><input type="checkbox" name="reminders" value="1" {{if $inv.RemindersEnabled}}checked{{end}}> {{.T "invoice.auto_reminders"}}</label>
+  </div>
+
+  <div class="form-actions sticky-actions">
+    <button class="btn" type="submit" name="action" value="save">{{.T "invoice.save_draft"}}</button>
+    <button class="btn" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.save_issue"}}</button>
+    {{if $d.CanSend}}<button class="btn btn-primary" type="submit" name="action" value="send" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.save_send"}}</button>{{end}}
+  </div>
+</form>
+{{end}}
+{{end}}

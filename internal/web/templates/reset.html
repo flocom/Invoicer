@@ -1,0 +1,22 @@
+{{define "content"}}
+<div class="auth">
+  <div class="auth-logo">{{template "icon" "file"}} Invoicer</div>
+  <div class="card auth-card">
+    <h1>{{.T "reset.title"}}</h1>
+    <p class="muted">{{.Data.Email}}</p>
+    <form method="post" class="stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div class="field">
+        <label for="password">{{.T "field.new_password"}}</label>
+        <input id="password" name="password" type="password" required minlength="12" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="password2">{{.T "field.password_confirm"}}</label>
+        <input id="password2" name="password2" type="password" required minlength="12" autocomplete="new-password">
+      </div>
+      <p class="hint">{{.T "field.password_hint"}}</p>
+      <button class="btn btn-primary btn-block" type="submit">{{.T "reset.submit"}}</button>
+    </form>
+  </div>
+</div>
+{{end}}

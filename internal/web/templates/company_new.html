@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="page-head"><div><h1>{{.T "company.new"}}</h1><p class="muted">{{.T "company.new_intro"}}</p></div></div>
+<form method="post" action="/companies/new" class="card form-card stack">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <div class="field">
+    <label for="name">{{.T "field.company_name"}}</label>
+    <input id="name" name="name" required maxlength="200" autofocus value="{{.Data.Name}}">
+  </div>
+  <div class="grid-2">
+    <div class="field">
+      <label for="currency">{{.T "field.default_currency"}}</label>
+      <select id="currency" name="currency">{{range currencies}}<option {{if eq . $.Data.Currency}}selected{{end}}>{{.}}</option>{{end}}</select>
+    </div>
+    <div class="field">
+      <label for="lang">{{.T "field.default_doc_lang"}}</label>
+      <select id="lang" name="lang">{{range langs}}<option value="{{.}}" {{if eq . $.Data.Lang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "company.create"}}</button></div>
+</form>
+{{end}}
