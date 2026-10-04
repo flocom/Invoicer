@@ -48,14 +48,39 @@ func Equal(a, b string) bool {
 
 // ---------- passwords (Argon2id) ----------
 
+// OWASP recommended Argon2id parameters (19 MiB, 2 passes, 1 lane).
 const (
-	argonTime    = 3
-	argonMemory  = 64 * 1024
-	argonThreads = 2
+	argonTime    = 2
+	argonMemory  = 19 * 1024
+	argonThreads = 1
 	argonKeyLen  = 32
 )
 
+// ErrBusy is returned when too many password hashes are being computed at
+// once; callers answer "try again" instead of exhausting memory.
+var ErrBusy = errors.New("password hashing is busy")
+
+// hashSlots bounds concurrent Argon2 computations (memory = slots × 19 MiB).
+var hashSlots = make(chan struct{}, 2)
+
+func acquireHash() bool {
+	select {
+	case hashSlots <- struct{}{}:
+		return true
+	case <-time.After(5 * time.Second):
+		return false
+	}
+}
+
+func releaseHash() { <-hashSlots }
+
 func HashPassword(pw string) string {
+	if !acquireHash() {
+		// Hashing only happens on authenticated or rate-limited paths; wait
+		// rather than fail so a legitimate password change still succeeds.
+		hashSlots <- struct{}{}
+	}
+	defer releaseHash()
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		panic(err)
@@ -67,7 +92,30 @@ func HashPassword(pw string) string {
 
 var dummyHash = HashPassword(Token(16))
 
+// CheckPassword verifies pw against an Argon2id hash. It returns false when
+// the hashing capacity is exhausted (see CheckPasswordErr to tell apart).
 func CheckPassword(hash, pw string) bool {
+	ok, _ := CheckPasswordErr(hash, pw)
+	return ok
+}
+
+// NeedsRehash reports whether a stored hash uses outdated parameters.
+func NeedsRehash(hash string) bool {
+	return !strings.HasPrefix(hash, fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$", argonMemory, argonTime, argonThreads))
+}
+
+func CheckPasswordErr(hash, pw string) (bool, error) {
+	if len(pw) > 1024 {
+		return false, nil
+	}
+	if !acquireHash() {
+		return false, ErrBusy
+	}
+	defer releaseHash()
+	return checkPassword(hash, pw), nil
+}
+
+func checkPassword(hash, pw string) bool {
 	if hash == "" {
 		// Spend the same time as a real check so unknown accounts are not
 		// distinguishable by timing.
@@ -83,6 +131,9 @@ func CheckPassword(hash, pw string) bool {
 	var p uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &p); err != nil {
 		return false
+	}
+	if m > 128*1024 || t > 10 || p == 0 || p > 8 {
+		return false // refuse hashes that would cost excessive resources
 	}
 	salt, err1 := base64.RawStdEncoding.DecodeString(parts[4])
 	want, err2 := base64.RawStdEncoding.DecodeString(parts[5])
@@ -204,6 +255,9 @@ func totpAt(secret string, counter uint64) string {
 	code := (binary.BigEndian.Uint32(sum[off:off+4]) & 0x7fffffff) % 1000000
 	return fmt.Sprintf("%06d", code)
 }
+
+// TOTPCode returns the code valid at t (used by tests and tooling).
+func TOTPCode(secret string, t time.Time) string { return totpAt(secret, uint64(t.Unix()/30)) }
 
 // CheckTOTP accepts the current code and one step of clock drift either way.
 // It returns the matched counter so callers can reject replays.

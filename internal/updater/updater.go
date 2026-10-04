@@ -452,7 +452,10 @@ type version struct {
 
 func parseVersion(s string) (version, bool) {
 	s = strings.TrimPrefix(strings.TrimSpace(s), "v")
-	core, pre, _ := strings.Cut(s, "-")
+	core, pre, hasPre := strings.Cut(s, "-")
+	if hasPre && !validPre(pre) {
+		return version{}, false // versions end up in file names: keep them strict
+	}
 	parts := strings.Split(core, ".")
 	if len(parts) != 3 {
 		return version{}, false
@@ -466,6 +469,18 @@ func parseVersion(s string) (version, bool) {
 		n[i] = v
 	}
 	return version{n[0], n[1], n[2], pre}, true
+}
+
+func validPre(p string) bool {
+	if p == "" || len(p) > 32 {
+		return false
+	}
+	for _, r := range p {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 func compareVersions(a, b string) int {

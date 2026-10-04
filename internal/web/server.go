@@ -32,15 +32,16 @@ import (
 var assets embed.FS
 
 type Server struct {
-	App      *app.App
-	Store    *store.Store
-	tpl      *templates
-	limiter  *limiter
-	trustAll bool // TRUST_PROXY=true
-	noTrust  bool // TRUST_PROXY=false
-	static   http.Handler
-	assetVer string
-	csrfKey  []byte
+	App        *app.App
+	Store      *store.Store
+	tpl        *templates
+	limiter    *limiter
+	trustAll   bool // TRUST_PROXY=true
+	noTrust    bool // TRUST_PROXY=false (default with TLS=auto: no proxy in front)
+	cloudflare bool // TRUST_PROXY=cloudflare: also honour CF-Connecting-IP
+	static     http.Handler
+	assetVer   string
+	csrfKey    []byte
 }
 
 func New(a *app.App) (*Server, error) {
@@ -50,8 +51,12 @@ func New(a *app.App) (*Server, error) {
 	}
 	sub, _ := fs.Sub(assets, "static")
 	tp := strings.ToLower(os.Getenv("TRUST_PROXY"))
+	if tp == "" && a.Cfg.TLS == "auto" {
+		tp = "false" // we terminate TLS ourselves: forwarded headers can only be forged
+	}
 	s := &Server{App: a, Store: a.Store, tpl: t, limiter: newLimiter(), trustAll: tp == "true", noTrust: tp == "false",
-		static: http.FileServer(http.FS(sub)), assetVer: assetHash(sub),
+		cloudflare: tp == "cloudflare",
+		static:     http.FileServer(http.FS(sub)), assetVer: assetHash(sub),
 		csrfKey: []byte(security.Token(32))}
 	return s, nil
 }
@@ -76,7 +81,7 @@ func (s *Server) Handler() http.Handler {
 
 	// public
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
-	m.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(s.static)))
+	m.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(noListing(s.static))))
 	m.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/favicon.svg", http.StatusMovedPermanently)
 	})
@@ -114,13 +119,14 @@ func (s *Server) Handler() http.Handler {
 
 	m.HandleFunc("GET /admin/users", s.h(s.admin(s.usersPage)))
 	m.HandleFunc("POST /admin/invites", s.h(s.admin(s.inviteCreate)))
+	m.HandleFunc("POST /admin/invites/{id}/revoke", s.h(s.admin(s.inviteRevoke)))
 	m.HandleFunc("POST /admin/users/{uid}", s.h(s.admin(s.userUpdate)))
 	m.HandleFunc("POST /admin/users/{uid}/reset", s.h(s.admin(s.userReset)))
 	m.HandleFunc("POST /admin/users/{uid}/delete", s.h(s.admin(s.userDelete)))
 	m.HandleFunc("POST /admin/users/{uid}/transfer", s.h(s.owner(s.ownershipTransfer)))
 	m.HandleFunc("GET /admin/system", s.h(s.owner(s.systemPage)))
 	m.HandleFunc("POST /admin/system", s.h(s.owner(s.systemSave)))
-	m.HandleFunc("POST /admin/system/domain", s.h(s.admin(s.systemDomain)))
+	m.HandleFunc("POST /admin/system/domain", s.h(s.owner(s.systemDomain)))
 	m.HandleFunc("POST /admin/system/update-check", s.h(s.owner(s.updateCheck)))
 	m.HandleFunc("POST /admin/system/update-install", s.h(s.owner(s.updateInstall)))
 	m.HandleFunc("POST /admin/system/backup", s.h(s.owner(s.backupNow)))
@@ -270,7 +276,7 @@ func (s *Server) isHTTPS(r *http.Request) bool {
 		if strings.EqualFold(firstHeader(r, "X-Forwarded-Proto"), "https") {
 			return true
 		}
-		if strings.Contains(r.Header.Get("Cf-Visitor"), `"https"`) {
+		if s.cloudflare && strings.Contains(r.Header.Get("Cf-Visitor"), `"https"`) {
 			return true
 		}
 	}
@@ -290,8 +296,10 @@ func (s *Server) clientIP(r *http.Request) string {
 	if !s.trusted(r) {
 		return host
 	}
-	if v := r.Header.Get("Cf-Connecting-Ip"); v != "" && net.ParseIP(v) != nil {
-		return v
+	if s.cloudflare {
+		if v := r.Header.Get("Cf-Connecting-Ip"); v != "" && net.ParseIP(v) != nil {
+			return v
+		}
 	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -305,9 +313,6 @@ func (s *Server) clientIP(r *http.Request) string {
 				return ip.String()
 			}
 		}
-	}
-	if v := r.Header.Get("X-Real-Ip"); net.ParseIP(v) != nil {
-		return v
 	}
 	return host
 }
@@ -385,6 +390,7 @@ type Ctx struct {
 	Company *store.Company
 	Lang    string
 	IP      string
+	RL      string // rate-limit key for the client (IPv6 grouped by /64)
 	s       *Server
 }
 
@@ -402,6 +408,7 @@ const (
 func (s *Server) h(fn handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := &Ctx{W: w, R: r, IP: s.clientIP(r), s: s, Lang: "en"}
+		c.RL = ipKey(c.IP)
 		s.loadSession(c)
 		if c.User == nil {
 			c.Lang = negotiateLang(r)
@@ -436,7 +443,11 @@ func negotiateLang(r *http.Request) string {
 
 func (s *Server) loadSession(c *Ctx) {
 	var tok string
-	for _, name := range []string{cookieSessionSecure, cookieSession} {
+	names := []string{cookieSession}
+	if s.isHTTPS(c.R) {
+		names = []string{cookieSessionSecure} // a non-prefixed cookie could be planted by a sibling domain
+	}
+	for _, name := range names {
 		if ck, err := c.R.Cookie(name); err == nil && ck.Value != "" {
 			tok = ck.Value
 			break
@@ -583,7 +594,7 @@ func (s *Server) company(fn handler) handler {
 // automatically when empty and upgraded from http to https for the same host.
 // Other changes are offered to administrators as a banner.
 func (s *Server) syncOrigin(c *Ctx) {
-	if !c.User.IsAdmin() {
+	if !c.User.IsOwner() {
 		return
 	}
 	o := s.detectOrigin(c.R)
@@ -641,8 +652,35 @@ func (s *Server) clearSession(c *Ctx) {
 
 // ---------- small helpers ----------
 
+// isLocalPath accepts only same-site absolute paths. Browsers ignore tabs and
+// newlines and treat "\\" like "/", so "/\t/evil.com" would become
+// "//evil.com": any control character or backslash is refused.
+func isLocalPath(p string) bool {
+	if p == "" || len(p) > 500 || p[0] != '/' || strings.HasPrefix(p, "//") || strings.ContainsRune(p, '\\') {
+		return false
+	}
+	for _, r := range p {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	u, err := url.Parse(p)
+	return err == nil && u.Scheme == "" && u.Host == "" && !strings.HasPrefix(u.Path, "//")
+}
+
+// noListing hides directory listings of the static file server.
+func noListing(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
 func (c *Ctx) redirect(to string) error {
-	if !strings.HasPrefix(to, "/") || strings.HasPrefix(to, "//") || strings.HasPrefix(to, "/\\") {
+	if !isLocalPath(to) {
 		to = "/"
 	}
 	http.Redirect(c.W, c.R, to, http.StatusSeeOther)

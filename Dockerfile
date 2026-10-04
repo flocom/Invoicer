@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ---- build ----
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:8ac98ca534ac3f51e1f420a1dd2c15e74c75cfa0f23f3ad27eb5d7236c349a0c AS build
 ARG TARGETOS=linux
 ARG TARGETARCH
 ARG VERSION=v0.0.0-dev
@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
  && mkdir -p /out/data
 
 # ---- runtime: distroless, static, non-root, no shell ----
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 LABEL org.opencontainers.image.source="https://github.com/flocom/Invoicer" \
       org.opencontainers.image.description="Self-hosted invoicing: multi-company, Stripe, Resend, recurring invoices" \
       org.opencontainers.image.licenses="LicenseRef-PolyForm-Internal-Use-1.0.0"

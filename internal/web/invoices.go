@@ -166,7 +166,7 @@ func parseLines(c *Ctx) ([]store.Line, error) {
 		p, err2 := money.ParseAmount(price[i])
 		t, err3 := money.ParseRate(tax[i])
 		if err1 != nil || err2 != nil || err3 != nil || d == "" || q == 0 || t < 0 || t > 10000 ||
-			q > 1e12 || q < -1e12 || p > 1e13 || p < -1e13 {
+			!withinLimits(q, p) {
 			return nil, errors.New("err.lines")
 		}
 		out = append(out, store.Line{Position: len(out), Description: clip(d, 2000), Quantity: q, UnitPrice: p, TaxBP: t})
@@ -175,6 +175,24 @@ func parseLines(c *Ctx) ([]store.Line, error) {
 		return nil, errors.New("err.no_lines")
 	}
 	return out, nil
+}
+
+// withinLimits keeps quantity × price (and the tax computed on up to 200
+// such lines) far from int64 overflow: |q·p| ≤ 9e14 means at most 9 billion
+// currency units per line.
+func withinLimits(q, p int64) bool {
+	const maxQ, maxP, maxProduct = 1_000_000_000, 100_000_000_000, 900_000_000_000_000
+	if q > maxQ || q < -maxQ || p > maxP || p < -maxP {
+		return false
+	}
+	aq, ap := q, p
+	if aq < 0 {
+		aq = -aq
+	}
+	if ap < 0 {
+		ap = -ap
+	}
+	return ap == 0 || aq <= maxProduct/ap
 }
 
 func validDate(s string) bool {
@@ -345,6 +363,10 @@ func (s *Server) invoiceRemind(c *Ctx) error {
 	if err != nil {
 		return err
 	}
+	if !s.limiter.allow("send:"+itoa(c.Company.ID), 30, 10*time.Minute) || !s.limiter.allow("remind:"+itoa(inv.ID), 3, 24*time.Hour) {
+		c.bad("err.rate_limited")
+		return c.redirect(c.cpath("/invoices/%d", inv.ID))
+	}
 	kind := "reminder_overdue"
 	today := s.App.Today()
 	if inv.DueDate > today {
@@ -408,6 +430,10 @@ func (s *Server) paymentAdd(c *Ctx) error {
 		return c.redirect(c.cpath("/invoices/%d", inv.ID))
 	}
 	c.audit("payment.recorded", fmt.Sprintf("%s %s %s", inv.Number, money.Format(amount, inv.Currency, "en"), method))
+	// the amount due changed: older card payment links must not stay payable
+	ectx, ecancel := context.WithTimeout(c.R.Context(), 20*time.Second)
+	s.App.ExpireSessions(ectx, c.Company, inv.ID, "")
+	ecancel()
 	if became && c.form("receipt") == "1" {
 		if inv, err := s.Store.Invoice(c.Company.ID, inv.ID); err == nil {
 			ctx, cancel := context.WithTimeout(c.R.Context(), 30*time.Second)
@@ -423,6 +449,13 @@ func (s *Server) paymentDelete(c *Ctx) error {
 	inv, err := s.loadInvoice(c)
 	if err != nil {
 		return err
+	}
+	// payments confirmed by Stripe are facts recorded by the payment provider
+	pays, _ := s.Store.Payments(inv.ID)
+	for _, p := range pays {
+		if p.ID == c.id("pid") && p.StripeSessionID != "" {
+			return errForbidden
+		}
 	}
 	if err := s.Store.DeletePayment(inv.ID, c.id("pid")); err != nil {
 		return err
@@ -440,6 +473,9 @@ func (s *Server) invoiceVoid(c *Ctx) error {
 	if err := s.Store.Void(c.Company.ID, inv.ID); err != nil {
 		c.flash("err", err.Error())
 	} else {
+		ctx, cancel := context.WithTimeout(c.R.Context(), 20*time.Second)
+		s.App.ExpireSessions(ctx, c.Company, inv.ID, "")
+		cancel()
 		c.audit("invoice.void", inv.Number)
 		c.ok("invoice.voided")
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"rsc.io/qr"
@@ -128,8 +129,22 @@ func (s *Server) mfaEnable(c *Ctx) error {
 }
 
 func (s *Server) mfaDisable(c *Ctx) error {
+	if !s.limiter.allow("pw:"+itoa(c.User.ID), 5, 10*time.Minute) {
+		c.bad("err.rate_limited")
+		return c.redirect("/account")
+	}
 	if !security.CheckPassword(c.User.PasswordHash, c.R.PostFormValue("current")) {
 		c.bad("err.password_current")
+		return c.redirect("/account")
+	}
+	// a stolen session plus the password must not be enough to strip 2FA
+	// (a recovery code is accepted too, for someone who lost their phone)
+	code := strings.ToLower(strings.ReplaceAll(c.form("code"), " ", ""))
+	secret, err := s.App.Box.Open(c.User.TOTPSecret, totpAAD(c.User.ID))
+	ctr, valid := security.CheckTOTP(secret, code, time.Now())
+	totpOK := err == nil && secret != "" && valid && s.Store.UseTOTPCounter(c.User.ID, int64(ctr))
+	if !totpOK && !(len(code) == 11 && consumeRecovery(s.Store, c.User, code)) {
+		c.bad("err.mfa_code")
 		return c.redirect("/account")
 	}
 	if err := s.Store.SetTOTP(c.User.ID, nil, false, ""); err != nil {

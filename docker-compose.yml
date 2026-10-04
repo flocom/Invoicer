@@ -2,7 +2,7 @@
 # background jobs, automatic updates). No configuration is required.
 #
 #   docker compose up -d
-#   docker compose logs invoicer     # shows the one-time setup token
+# then open the site: the first account created becomes the owner.
 #
 services:
   invoicer:
@@ -10,7 +10,9 @@ services:
     container_name: invoicer
     restart: unless-stopped
     ports:
-      - "8080:8080"          # put your reverse proxy (Caddy, Traefik, Nginx, Cloudflare Tunnel…) in front
+      # Behind a reverse proxy on the same host, prefer "127.0.0.1:8080:8080" so
+      # the app is only reachable through the proxy.
+      - "8080:8080"
       # With TLS=auto (built-in Let's Encrypt), use these instead:
       # - "80:8080"
       # - "443:8443"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +18,7 @@ import (
 )
 
 type usersData struct {
+	Invites     []store.PendingInvite
 	Users       []*store.User
 	Companies   []*store.Company
 	Memberships map[int64]map[int64]bool
@@ -32,6 +34,7 @@ func (s *Server) usersData(c *Ctx) (*usersData, error) {
 	}
 	cos, _ := s.Store.CompaniesFor(c.User, false)
 	d := &usersData{Users: users, Companies: cos, Memberships: map[int64]map[int64]bool{}}
+	d.Invites, _ = s.Store.PendingInvites()
 	for _, u := range users {
 		d.Memberships[u.ID], _ = s.Store.UserCompanyIDs(u.ID)
 	}
@@ -94,6 +97,20 @@ func (s *Server) inviteCreate(c *Ctx) error {
 	p := s.page(c, c.t("users.title"), "users", d)
 	p.Flash = &Flash{Kind: "ok", Msg: c.t("users.invite_created", email)}
 	return s.render(c, 200, "users", p)
+}
+
+func (s *Server) inviteRevoke(c *Ctx) error {
+	id := c.R.PathValue("id")
+	if len(id) != 64 {
+		return store.ErrNotFound
+	}
+	email, err := s.Store.RevokeInvite(id, c.User.IsOwner())
+	if err != nil {
+		return err
+	}
+	c.audit("invite.revoked", email)
+	c.ok("users.invite_revoked", email)
+	return c.redirect("/admin/users")
 }
 
 func (s *Server) targetUser(c *Ctx) (*store.User, error) {
@@ -174,6 +191,10 @@ func (s *Server) ownershipTransfer(c *Ctx) error {
 	if err != nil || target.ID == c.User.ID || target.Disabled {
 		return errForbidden
 	}
+	if !s.limiter.allow("pw:"+itoa(c.User.ID), 5, 10*time.Minute) {
+		c.bad("err.rate_limited")
+		return c.redirect("/admin/users")
+	}
 	if !security.CheckPassword(c.User.PasswordHash, c.R.PostFormValue("current")) {
 		c.bad("err.password_current")
 		return c.redirect("/admin/users")
@@ -252,10 +273,27 @@ func (s *Server) systemSave(c *Ctx) error {
 
 // systemDomain records the origin the administrator is currently using as the
 // public URL (used in e-mails, payment links and Stripe webhooks).
+//
+// It changes where every e-mailed link, invitation and reset link points, so
+// it is owner-only, requires the password, and honours DOMAIN when set.
 func (s *Server) systemDomain(c *Ctx) error {
 	o := s.detectOrigin(c.R)
 	if o == "" {
 		return errForbidden
+	}
+	if !s.limiter.allow("pw:"+itoa(c.User.ID), 5, 10*time.Minute) {
+		c.bad("err.rate_limited")
+		return c.redirect("/admin/system")
+	}
+	if !security.CheckPassword(c.User.PasswordHash, c.R.PostFormValue("current")) {
+		c.bad("err.password_current")
+		return c.redirect("/admin/system")
+	}
+	if d := strings.ToLower(strings.TrimSpace(os.Getenv("DOMAIN"))); d != "" {
+		if u, err := url.Parse(o); err != nil || !strings.EqualFold(u.Hostname(), d) {
+			c.bad("system.domain_mismatch", d)
+			return c.redirect("/admin/system")
+		}
 	}
 	s.Store.SetSetting("base_url", o)
 	c.audit("system.base_url", o)

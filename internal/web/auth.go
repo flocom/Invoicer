@@ -48,7 +48,7 @@ func (s *Server) setupSubmit(c *Ctx) error {
 		p.Error = c.t(key)
 		return s.render(c, 400, "setup", p)
 	}
-	if !s.limiter.allow("setup:"+c.IP, 10, 10*time.Minute) {
+	if !s.limiter.allow("setup:"+c.RL, 10, 10*time.Minute) {
 		return fail("err.rate_limited")
 	}
 	if d.Name == "" {
@@ -90,7 +90,7 @@ type loginData struct {
 }
 
 func safeNext(n string) string {
-	if !strings.HasPrefix(n, "/") || strings.HasPrefix(n, "//") || strings.Contains(n, "\\") || len(n) > 300 {
+	if !isLocalPath(n) || len(n) > 300 {
 		return "/"
 	}
 	return n
@@ -107,33 +107,49 @@ func (s *Server) loginForm(c *Ctx) error {
 	return s.render(c, 200, "login", p)
 }
 
+// loginFailKey identifies the failure budget of one client against one
+// account: a remote attacker can exhaust their own budget but cannot lock the
+// legitimate user out (their budget is separate).
+func loginFailKey(email, client string) string { return "login-fail:" + email + "|" + client }
+
 func (s *Server) loginSubmit(c *Ctx) error {
-	d := &loginData{Email: strings.ToLower(c.form("email")), Next: safeNext(c.form("next"))}
+	email := strings.ToLower(c.form("email"))
+	if len(email) > 254 {
+		email = ""
+	}
+	d := &loginData{Email: email, Next: safeNext(c.form("next"))}
 	fail := func(key string, status int) error {
 		p := s.page(c, c.t("login.title"), "", d)
 		p.Error = c.t(key)
 		return s.render(c, status, "login", p)
 	}
-	if !s.limiter.allow("login-ip:"+c.IP, 10, 5*time.Minute) || !s.limiter.allow("login-email:"+d.Email, 8, 10*time.Minute) {
+	if !s.limiter.allow("login-ip:"+c.RL, 10, 5*time.Minute) {
 		return fail("err.rate_limited", 429)
 	}
+	failKey := loginFailKey(email, c.RL)
+	if !s.limiter.peek(failKey, 5, 15*time.Minute) {
+		return fail("err.rate_limited", 429) // same answer for known and unknown accounts
+	}
 	pw := c.R.PostFormValue("password")
-	u, err := s.Store.UserByEmail(d.Email)
-	if err != nil {
-		security.CheckPassword("", pw) // constant time
+	u, uerr := s.Store.UserByEmail(email)
+	hash := ""
+	if uerr == nil {
+		hash = u.PasswordHash
+	}
+	ok, herr := security.CheckPasswordErr(hash, pw) // runs even for unknown e-mails (constant time)
+	if herr != nil {
+		return fail("err.rate_limited", 429)
+	}
+	if uerr != nil || !ok || u.Disabled {
+		s.limiter.allow(failKey, 5, 15*time.Minute)
+		if uerr == nil {
+			s.Store.RecordLoginFailure(u.ID)
+			s.Store.Audit(u.ID, 0, c.IP, "login.failed", "")
+		}
 		return fail("err.login", 401)
 	}
-	if u.LockedUntil > time.Now().Unix() {
-		security.CheckPassword("", pw)
-		return fail("err.locked", 429)
-	}
-	if !security.CheckPassword(u.PasswordHash, pw) {
-		s.Store.RecordLoginFailure(u.ID)
-		s.Store.Audit(u.ID, 0, c.IP, "login.failed", "")
-		return fail("err.login", 401)
-	}
-	if u.Disabled {
-		return fail("err.disabled", 403)
+	if security.NeedsRehash(u.PasswordHash) {
+		s.Store.UpdatePasswordHash(u.ID, security.HashPassword(pw))
 	}
 	if u.TOTPEnabled {
 		if err := s.startSession(c, u, true); err != nil {
@@ -171,13 +187,17 @@ func (s *Server) mfaSubmit(c *Ctx) error {
 		p.Error = c.t(key)
 		return s.render(c, 401, "mfa", p)
 	}
-	if !s.limiter.allow("mfa:"+hex.EncodeToString(c.SessID[:8]), 5, 5*time.Minute) || u.LockedUntil > time.Now().Unix() {
+	if !s.limiter.allow("mfa:"+hex.EncodeToString(c.SessID[:8]), 5, 5*time.Minute) ||
+		!s.limiter.allow("mfa-user:"+itoa(u.ID), 10, 15*time.Minute) {
 		return fail("err.rate_limited")
 	}
 	code := strings.ToLower(strings.ReplaceAll(c.form("code"), " ", ""))
 	okCode := false
-	secret, _ := s.App.Box.Open(u.TOTPSecret, totpAAD(u.ID))
-	if ctr, valid := security.CheckTOTP(secret, code, time.Now()); valid && s.Store.UseTOTPCounter(u.ID, int64(ctr)) {
+	secret, serr := s.App.Box.Open(u.TOTPSecret, totpAAD(u.ID))
+	if serr != nil || secret == "" {
+		// never fall back to an empty key: an undecryptable secret means no valid code
+		slog.Error("cannot decrypt TOTP secret", "user", u.ID, "err", serr)
+	} else if ctr, valid := security.CheckTOTP(secret, code, time.Now()); valid && s.Store.UseTOTPCounter(u.ID, int64(ctr)) {
 		okCode = true
 	} else if len(code) == 11 && consumeRecovery(s.Store, u, code) {
 		okCode = true
@@ -204,10 +224,10 @@ func consumeRecovery(st *store.Store, u *store.User, code string) bool {
 	h := hex.EncodeToString(security.HashToken(code))
 	for i, x := range hashes {
 		if security.Equal(x, h) {
-			hashes = append(hashes[:i], hashes[i+1:]...)
-			b, _ := json.Marshal(hashes)
-			st.SetRecoveryCodes(u.ID, string(b))
-			return true
+			rest := append(append([]string{}, hashes[:i]...), hashes[i+1:]...)
+			b, _ := json.Marshal(rest)
+			// compare-and-swap: two concurrent uses of the same code cannot both succeed
+			return st.ReplaceRecoveryCodes(u.ID, u.RecoveryCodes, string(b))
 		}
 	}
 	return false
@@ -253,7 +273,7 @@ func (s *Server) inviteSubmit(c *Ctx) error {
 		p.Error = c.t(key)
 		return s.render(c, 400, "invite", p)
 	}
-	if !s.limiter.allow("invite:"+c.IP, 10, 10*time.Minute) {
+	if !s.limiter.allow("invite:"+c.RL, 10, 10*time.Minute) {
 		return fail("err.rate_limited")
 	}
 	if d.Name == "" {
@@ -305,7 +325,7 @@ func (s *Server) resetSubmit(c *Ctx) error {
 		p.Error = c.t(key)
 		return s.render(c, 400, "reset", p)
 	}
-	if !s.limiter.allow("reset:"+c.IP, 10, 10*time.Minute) {
+	if !s.limiter.allow("reset:"+c.RL, 10, 10*time.Minute) {
 		return fail("err.rate_limited")
 	}
 	pw := c.R.PostFormValue("password")

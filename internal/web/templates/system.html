@@ -33,7 +33,11 @@
         <dt>Stripe webhooks</dt><dd>{{if $d.PublicTLS}}{{.T "system.webhooks_possible"}}{{else}}{{.T "system.webhooks_polling"}}{{end}}</dd>
       </dl>
       {{if ne $d.DetectedO .BaseURL}}
-      <form method="post" action="/admin/system/domain"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="back" value="/admin/system"><button class="btn" type="submit">{{.T "banner.use_origin"}}</button></form>
+      <form method="post" action="/admin/system/domain" class="row wrap" data-confirm="{{.T "system.domain_confirm" $d.DetectedO}}">
+        <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="back" value="/admin/system">
+        <input type="password" name="current" required autocomplete="current-password" placeholder="{{.T "field.current_password"}}" aria-label="{{.T "field.current_password"}}">
+        <button class="btn" type="submit">{{.T "banner.use_origin"}}</button>
+      </form>
       {{end}}
       <p class="hint">{{.T "system.public_url_hint"}}</p>
     </div>

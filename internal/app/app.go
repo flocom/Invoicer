@@ -34,6 +34,8 @@ type App struct {
 
 	mu  sync.RWMutex
 	loc *time.Location
+
+	checkoutLocks sync.Map // invoice id → *sync.Mutex
 }
 
 func New(cfg config.Config, st *store.Store, box *security.Box, up *updater.Updater) *App {
@@ -339,9 +341,15 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	if inv.Status != store.StatusOpen || inv.Due() <= 0 {
 		return "", errors.New("this invoice has nothing left to pay")
 	}
+	// one session at a time per invoice: concurrent clicks reuse the same one
+	lk, _ := a.checkoutLocks.LoadOrStore(inv.ID, &sync.Mutex{})
+	lk.(*sync.Mutex).Lock()
+	defer lk.(*sync.Mutex).Unlock()
 	if ss, err := a.Store.ReusableStripeSession(inv.ID, inv.Due()); err == nil {
 		return ss.URL, nil
 	}
+	// sessions created for another amount must not stay payable
+	a.ExpireSessions(ctx, co, inv.ID, "")
 	lang := i18n.Norm(inv.Lang)
 	cl, _ := a.Store.Client(co.ID, inv.ClientID)
 	email := ""
@@ -365,6 +373,29 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	return s.URL, nil
 }
 
+// ExpireSessions closes every still-payable Checkout Session of an invoice
+// except `keep` (called when the invoice is voided or its amount due changes).
+func (a *App) ExpireSessions(ctx context.Context, co *store.Company, invoiceID int64, keep string) {
+	if !co.HasStripe() {
+		return
+	}
+	sessions, err := a.Store.OpenStripeSessions(invoiceID)
+	if err != nil {
+		return
+	}
+	key := a.StripeKey(co)
+	for _, ss := range sessions {
+		if ss.ID == keep {
+			continue
+		}
+		if err := stripe.ExpireCheckout(ctx, key, ss.ID); err != nil {
+			slog.Warn("could not expire Stripe session", "session", ss.ID, "err", err)
+			continue
+		}
+		a.Store.SetStripeSessionStatus(ss.ID, "expired")
+	}
+}
+
 // ApplyStripeSession records the payment of a completed Checkout Session.
 // It is safe to call several times for the same session.
 func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stripe.Session) error {
@@ -384,7 +415,20 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 		return nil
 	}
 	if !strings.EqualFold(s.Currency, inv.Currency) {
-		return fmt.Errorf("currency mismatch on session %s", s.ID)
+		a.Store.Audit(0, co.ID, "", "payment.stripe_currency_mismatch", s.ID)
+		return nil // do not make Stripe retry: needs a manual check
+	}
+	if inv.Status == store.StatusVoid {
+		// money was taken on a voided invoice: keep a trace so it can be refunded
+		a.Store.SetStripeSessionStatus(s.ID, "complete")
+		a.Store.Audit(0, co.ID, "", "payment.stripe_on_void_invoice",
+			fmt.Sprintf("%s %s — refund needed (%s)", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en"), firstNonEmpty(s.PaymentIntent, s.ID)))
+		slog.Error("Stripe payment received for a voided invoice", "invoice", inv.ID, "session", s.ID)
+		return nil
+	}
+	if s.AmountTotal > inv.Due() {
+		a.Store.Audit(0, co.ID, "", "payment.stripe_overpaid",
+			fmt.Sprintf("%s paid %s, due %s", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en"), money.Format(inv.Due(), inv.Currency, "en")))
 	}
 	becamePaid, err := a.Store.RecordPayment(inv.ID, store.Payment{Amount: s.AmountTotal, Method: "stripe", Reference: firstNonEmpty(s.PaymentIntent, s.ID),
 		PaidOn: a.Today(), StripeSessionID: s.ID}, 0)
@@ -392,6 +436,7 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 		return err
 	}
 	a.Store.SetStripeSessionStatus(s.ID, "complete")
+	a.ExpireSessions(ctx, co, inv.ID, s.ID)
 	a.Store.Audit(0, co.ID, "", "payment.stripe", fmt.Sprintf("%s %s", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en")))
 	if becamePaid {
 		if inv, err := a.Store.Invoice(co.ID, inv.ID); err == nil {
