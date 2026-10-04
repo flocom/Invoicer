@@ -58,6 +58,17 @@ var funcs = template.FuncMap{
 		return "?"
 	},
 	"sub100": func(v int) int { return 100 - v },
+	"iban": func(s string) string {
+		s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
+		var b strings.Builder
+		for i, r := range s {
+			if i > 0 && i%4 == 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteRune(r)
+		}
+		return b.String()
+	},
 	"monthShort": func(lang, ym string) string {
 		t, err := time.Parse("2006-01", ym)
 		if err != nil {
