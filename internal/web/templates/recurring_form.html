@@ -53,6 +53,7 @@
         {{if not $d.CanSend}}<p class="hint">{{.T "recurring.auto_send_needs_email"}}</p>{{end}}
       </div>
     </div>
+    {{if $d.Banks}}<div class="grid-2"><div class="field"><label>{{.T "field.bank_account"}}</label>{{template "bankselect" (dict "P" $ "Banks" $d.Banks "Sel" $r.BankAccountID)}}<p class="hint">{{.T "bank.choice_hint"}}</p></div></div>{{end}}
     {{if $d.Preview}}<p class="hint">{{.T "recurring.preview"}} {{range $i, $p := $d.Preview}}{{if $i}}, {{end}}{{$.Date $p}}{{end}}…</p>{{end}}
   </div>
 

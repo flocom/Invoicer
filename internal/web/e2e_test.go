@@ -147,10 +147,10 @@ func TestEndToEnd(t *testing.T) {
 		"invoice_prefix": {"AC-"}, "payment_terms_days": {"30"},
 		"reminders_enabled": {"1"}, "reminder_days": {"-3, 0, 7, abc"}, "footer": {"Late fee 40 €"}})
 	b.must("Changes saved")
-	b.post("/c/1/settings/bank", url.Values{"iban": {"FR76 3000 6000 0112 3456 7890 189"}, "bic": {"AGRIFRPP"}, "email_bank_details": {"1"}})
-	b.must("Changes saved")
+	b.post("/c/1/settings/bank/accounts", url.Values{"currency": {"EUR"}, "iban": {"FR76 3000 6000 0112 3456 7890 189"}, "bic": {"AGRIFRPP"}})
+	b.must("Bank account saved")
 	co, _ := e.app.Store.Company(1)
-	if co.ReminderDays != "-3,0,7" || co.DefaultTaxBP != 2000 || co.IBAN != "FR7630006000011234567890189" {
+	if co.ReminderDays != "-3,0,7" || co.DefaultTaxBP != 2000 || co.BankCount != 1 {
 		t.Fatalf("invoicing settings not saved: %+v", co)
 	}
 

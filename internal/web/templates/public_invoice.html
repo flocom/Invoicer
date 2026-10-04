@@ -53,17 +53,17 @@
       <div class="total"><dt>{{.T "pdf.amount_due"}}</dt><dd>{{.Money $inv.Due $inv.Currency}}</dd></div>{{end}}
     </dl>
 
-    {{if and (eq $inv.Status "open") $d.Co.HasBank}}
+    {{if and (eq $inv.Status "open") $d.Bank}}{{$b := $d.Bank}}
     <div class="bank">
       <h3>{{.T "pdf.bank_transfer"}}</h3>
       <dl class="kv">
-        <dt>{{.T "pdf.account_holder"}}</dt><dd>{{if $d.Co.BankHolder}}{{$d.Co.BankHolder}}{{else}}{{$d.Seller.Name}}{{end}}</dd>
-        {{if $d.Co.BankName}}<dt>{{.T "pdf.bank"}}</dt><dd>{{$d.Co.BankName}}</dd>{{end}}
-        {{if $d.Co.IBAN}}<dt>IBAN</dt><dd class="mono">{{iban $d.Co.IBAN}} <button type="button" class="icon-btn" data-copy="{{$d.Co.IBAN}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></dd>{{end}}
-        {{if $d.Co.BIC}}<dt>BIC / SWIFT</dt><dd class="mono">{{$d.Co.BIC}}</dd>{{end}}
+        <dt>{{.T "pdf.account_holder"}}</dt><dd>{{if $b.Holder}}{{$b.Holder}}{{else}}{{$d.Seller.Name}}{{end}}</dd>
+        {{if $b.BankName}}<dt>{{.T "pdf.bank"}}</dt><dd>{{$b.BankName}}</dd>{{end}}
+        {{if $b.IBAN}}<dt>IBAN</dt><dd class="mono">{{iban $b.IBAN}} <button type="button" class="icon-btn" data-copy="{{$b.IBAN}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></dd>{{end}}
+        {{if $b.BIC}}<dt>BIC / SWIFT</dt><dd class="mono">{{$b.BIC}}</dd>{{end}}
         <dt>{{.T "pdf.reference"}}</dt><dd class="mono"><strong>{{$inv.Number}}</strong></dd>
       </dl>
-      {{if $d.Co.BankExtra}}<p class="pre small">{{$d.Co.BankExtra}}</p>{{end}}
+      {{if $b.Extra}}<p class="pre small">{{$b.Extra}}</p>{{end}}
     </div>
     {{end}}
     {{if $inv.Notes}}<p class="notes pre">{{$inv.Notes}}</p>{{end}}

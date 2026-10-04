@@ -259,4 +259,27 @@ CREATE INDEX audit_log_time ON audit_log(created_at);
 ALTER TABLE companies ADD COLUMN email_bank_details INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX clients_email ON clients(email COLLATE NOCASE);
 `,
+	// 3 — several bank accounts per company, chosen per invoice
+	`
+CREATE TABLE bank_accounts (
+	id         INTEGER PRIMARY KEY,
+	company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+	label      TEXT NOT NULL DEFAULT '',
+	currency   TEXT NOT NULL,
+	holder     TEXT NOT NULL DEFAULT '',
+	bank_name  TEXT NOT NULL DEFAULT '',
+	iban       TEXT NOT NULL DEFAULT '',
+	bic        TEXT NOT NULL DEFAULT '',
+	extra      TEXT NOT NULL DEFAULT '',
+	position   INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX bank_accounts_company ON bank_accounts(company_id);
+INSERT INTO bank_accounts(company_id, currency, holder, bank_name, iban, bic, extra, created_at)
+	SELECT id, default_currency, bank_holder, bank_name, iban, bic, bank_extra, created_at
+	FROM companies WHERE iban != '' OR bank_extra != '';
+-- 0 = automatic (account in the invoice currency), -1 = none, > 0 = that account
+ALTER TABLE invoices ADD COLUMN bank_account_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE recurring ADD COLUMN bank_account_id INTEGER NOT NULL DEFAULT 0;
+`,
 }

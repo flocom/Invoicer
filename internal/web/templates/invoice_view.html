@@ -111,8 +111,8 @@
         <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <textarea name="message" rows="3" maxlength="2000" placeholder="{{.T "invoice.message_ph"}}"></textarea>
-          {{if .Company.HasBank}}<input type="hidden" name="bank_present" value="1">
-          <label class="check small"><input type="checkbox" name="bank" value="1" {{if .Company.EmailBankDetails}}checked{{end}}> {{.T "invoice.include_bank"}}</label>{{end}}
+          {{if $d.Bank}}<input type="hidden" name="bank_present" value="1">
+          <label class="check small"><input type="checkbox" name="bank" value="1" {{if .Company.EmailBankDetails}}checked{{end}}> {{.T "invoice.include_bank_named" $d.Bank.Name}}</label>{{end}}
           <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "action.send"}}</button>
         </form>
       </details>
@@ -122,6 +122,16 @@
       {{end}}
       {{if not $inv.SentAt}}<form method="post" action="{{.CPath "/invoices/%d/mark-sent" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{.T "invoice.mark_sent"}}</button></form>{{end}}
     </div>
+    {{end}}
+
+    {{if and $d.Banks (or (eq $inv.Status "open") (eq $inv.Status "draft"))}}
+    <form method="post" action="{{.CPath "/invoices/%d/bank" $inv.ID}}" class="card stack small">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h3>{{.T "field.bank_account"}}</h3>
+      {{template "bankselect" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID)}}
+      <p class="hint">{{if $d.Bank}}{{.T "bank.shown" $d.Bank.Name}}{{else}}{{.T "bank.none_shown"}}{{end}}</p>
+      <button class="btn btn-sm" type="submit">{{.T "action.save"}}</button>
+    </form>
     {{end}}
 
     <div class="card stack small">

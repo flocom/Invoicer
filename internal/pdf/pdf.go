@@ -31,7 +31,8 @@ type Input struct {
 	Company *store.Company
 	Seller  store.Party
 	Buyer   store.Party
-	PayURL  string // online payment link (empty when Stripe is not set up)
+	PayURL  string             // online payment link (empty when Stripe is not set up)
+	Bank    *store.BankAccount // bank transfer details to print (nil: none)
 	Today   string
 }
 
@@ -281,7 +282,8 @@ func Render(in Input) ([]byte, error) {
 
 	// ----- payment info -----
 	p.SetY(afterTotals + 6)
-	if inv.Status != store.StatusVoid && inv.Due() > 0 && (co.HasBank() || in.PayURL != "") {
+	bank := in.Bank
+	if inv.Status != store.StatusVoid && inv.Due() > 0 && (bank != nil || in.PayURL != "") {
 		if p.GetY() > 297-70 {
 			p.AddPage()
 			p.SetY(margin + 4)
@@ -292,19 +294,19 @@ func Render(in Input) ([]byte, error) {
 		p.CellFormat(content, 5, strings.ToUpper(t("pdf.payment")), "", 1, "L", false, 0, "")
 		p.SetTextColor(60, 65, 78)
 		textW := content
-		qrPNG := epcQR(co, inv, in.Seller.Name)
+		qrPNG := epcQR(bank, inv, in.Seller.Name)
 		if qrPNG != nil {
 			textW = content - 34
 		}
-		if co.HasBank() {
+		if bank != nil {
 			p.SetFont("lato", "B", 9)
 			p.CellFormat(textW, 5, t("pdf.bank_transfer"), "", 1, "L", false, 0, "")
 			p.SetFont("lato", "", 9)
 			kv := [][2]string{
-				{t("pdf.account_holder"), firstNonEmpty(co.BankHolder, in.Seller.Name)},
-				{t("pdf.bank"), co.BankName},
-				{"IBAN", formatIBAN(co.IBAN)},
-				{"BIC / SWIFT", co.BIC},
+				{t("pdf.account_holder"), firstNonEmpty(bank.Holder, in.Seller.Name)},
+				{t("pdf.bank"), bank.BankName},
+				{"IBAN", formatIBAN(bank.IBAN)},
+				{"BIC / SWIFT", bank.BIC},
 			}
 			for _, e := range kv {
 				if strings.TrimSpace(e[1]) == "" {
@@ -315,7 +317,7 @@ func Render(in Input) ([]byte, error) {
 				p.SetTextColor(40, 44, 55)
 				p.CellFormat(textW-32, 4.6, clean(e[1]), "", 1, "L", false, 0, "")
 			}
-			for _, l := range i18n.Lines(co.BankExtra) {
+			for _, l := range i18n.Lines(bank.Extra) {
 				p.SetTextColor(40, 44, 55)
 				p.CellFormat(textW, 4.6, clean(l), "", 1, "L", false, 0, "")
 			}
@@ -449,16 +451,19 @@ func formatIBAN(s string) string {
 
 // epcQR builds a SEPA credit transfer QR code (EPC069-12) for EUR invoices,
 // understood by most European banking apps.
-func epcQR(co *store.Company, inv *store.Invoice, sellerName string) []byte {
-	iban := strings.ToUpper(strings.ReplaceAll(co.IBAN, " ", ""))
-	if inv.Currency != "EUR" || iban == "" || inv.Due() <= 0 || inv.Due() > 99999999999 {
+func epcQR(bank *store.BankAccount, inv *store.Invoice, sellerName string) []byte {
+	if bank == nil {
 		return nil
 	}
-	name := firstNonEmpty(co.BankHolder, sellerName)
+	iban := strings.ToUpper(strings.ReplaceAll(bank.IBAN, " ", ""))
+	if inv.Currency != "EUR" || bank.Currency != "EUR" || iban == "" || inv.Due() <= 0 || inv.Due() > 99999999999 {
+		return nil
+	}
+	name := firstNonEmpty(bank.Holder, sellerName)
 	if len([]rune(name)) > 70 {
 		name = string([]rune(name)[:70])
 	}
-	payload := strings.Join([]string{"BCD", "002", "1", "SCT", strings.ToUpper(strings.ReplaceAll(co.BIC, " ", "")), name, iban,
+	payload := strings.Join([]string{"BCD", "002", "1", "SCT", strings.ToUpper(strings.ReplaceAll(bank.BIC, " ", "")), name, iban,
 		"EUR" + money.Input(inv.Due(), 2, true), "", "", inv.Number}, "\n")
 	code, err := qr.Encode(payload, qr.M)
 	if err != nil {

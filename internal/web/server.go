@@ -166,6 +166,7 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/invoices/{id}/delete", s.invoiceDelete)
 	c("POST /c/{cid}/invoices/{id}/duplicate", s.invoiceDuplicate)
 	c("POST /c/{cid}/invoices/{id}/reminders", s.invoiceToggleReminders)
+	c("POST /c/{cid}/invoices/{id}/bank", s.invoiceSetBank)
 
 	c("GET /c/{cid}/recurring", s.recurringList)
 	c("GET /c/{cid}/recurring/new", s.recurringForm)
@@ -182,6 +183,9 @@ func (s *Server) Handler() http.Handler {
 	ca("POST /c/{cid}/settings/logo", s.companySaveLogo)
 	ca("POST /c/{cid}/settings/invoicing", s.companySaveInvoicing)
 	ca("POST /c/{cid}/settings/bank", s.companySaveBank)
+	ca("POST /c/{cid}/settings/bank/accounts", s.bankCreate)
+	ca("POST /c/{cid}/settings/bank/accounts/{bid}", s.bankUpdate)
+	ca("POST /c/{cid}/settings/bank/accounts/{bid}/delete", s.bankDelete)
 	ca("POST /c/{cid}/settings/email", s.companySaveEmail)
 	ca("POST /c/{cid}/settings/email/test", s.companyTestEmail)
 	ca("POST /c/{cid}/settings/stripe", s.companySaveStripe)

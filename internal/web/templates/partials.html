@@ -99,3 +99,30 @@
 </table>
 </div>
 {{end}}
+
+{{define "bankfields"}}
+{{$p := .P}}{{$b := .B}}
+<div class="grid-2">
+  <div class="field"><label>{{$p.T "field.bank_label"}}</label><input name="label" maxlength="80" value="{{if $b}}{{$b.Label}}{{end}}" placeholder="{{$p.T "field.bank_label_ph"}}"></div>
+  <div class="field"><label>{{$p.T "field.currency"}}</label>
+    <select name="currency">{{range currencies}}<option {{if $b}}{{if eq . $b.Currency}}selected{{end}}{{else if eq . $.C.DefaultCurrency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
+</div>
+<div class="grid-2">
+  <div class="field"><label>{{$p.T "field.account_holder"}}</label><input name="holder" maxlength="200" value="{{if $b}}{{$b.Holder}}{{end}}" placeholder="{{$.C.DisplayName}}"></div>
+  <div class="field"><label>{{$p.T "field.bank_name"}}</label><input name="bank_name" maxlength="200" value="{{if $b}}{{$b.BankName}}{{end}}"></div>
+</div>
+<div class="grid-2">
+  <div class="field"><label>IBAN</label><input name="iban" maxlength="40" class="mono" value="{{if $b}}{{iban $b.IBAN}}{{end}}"></div>
+  <div class="field"><label>BIC / SWIFT</label><input name="bic" maxlength="15" class="mono" value="{{if $b}}{{$b.BIC}}{{end}}"></div>
+</div>
+<div class="field"><label>{{$p.T "field.bank_extra"}}</label><textarea name="extra" rows="2" maxlength="600">{{if $b}}{{$b.Extra}}{{end}}</textarea><p class="hint">{{$p.T "field.bank_extra_hint"}}</p></div>
+{{end}}
+
+{{define "bankselect"}}
+{{$p := .P}}
+<select name="bank_account" aria-label="{{$p.T "field.bank_account"}}">
+  <option value="auto" {{if eq .Sel 0}}selected{{end}}>{{$p.T "bank.auto"}}</option>
+  {{range .Banks}}<option value="{{.ID}}" {{if eq $.Sel .ID}}selected{{end}}>{{.Name}}</option>{{end}}
+  <option value="none" {{if eq .Sel -1}}selected{{end}}>{{$p.T "bank.none"}}</option>
+</select>
+{{end}}

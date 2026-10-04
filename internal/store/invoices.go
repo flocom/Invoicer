@@ -69,6 +69,7 @@ type Invoice struct {
 	RecurringID      int64
 	RemindersEnabled bool
 	RemindersSent    string
+	BankAccountID    int64 // BankAuto, BankNone or an account id
 	SentAt           int64
 	PaidAt           int64
 	VoidedAt         int64
@@ -160,13 +161,15 @@ func ComputeTotals(lines []Line) (sub, tax, total int64) {
 
 const invoiceCols = `i.id, i.company_id, i.client_id, COALESCE(i.number, ''), i.status, i.currency, i.lang, i.issue_date, i.due_date,
 	i.subtotal, i.tax_total, i.total, i.amount_paid, i.notes, i.public_token, i.client_snapshot, i.company_snapshot,
-	i.recurring_id, i.reminders_enabled, i.reminders_sent, i.sent_at, i.paid_at, i.voided_at, i.created_at, i.updated_at, c.name`
+	i.recurring_id, i.reminders_enabled, i.reminders_sent, i.sent_at, i.paid_at, i.voided_at, i.created_at, i.updated_at, c.name,
+	i.bank_account_id`
 
 func scanInvoice(row interface{ Scan(...any) error }) (*Invoice, error) {
 	i := &Invoice{}
 	err := row.Scan(&i.ID, &i.CompanyID, &i.ClientID, &i.Number, &i.Status, &i.Currency, &i.Lang, &i.IssueDate, &i.DueDate,
 		&i.Subtotal, &i.TaxTotal, &i.Total, &i.AmountPaid, &i.Notes, &i.PublicToken, &i.ClientSnapshot, &i.CompanySnapshot,
-		&i.RecurringID, &i.RemindersEnabled, &i.RemindersSent, &i.SentAt, &i.PaidAt, &i.VoidedAt, &i.CreatedAt, &i.UpdatedAt, &i.ClientName)
+		&i.RecurringID, &i.RemindersEnabled, &i.RemindersSent, &i.SentAt, &i.PaidAt, &i.VoidedAt, &i.CreatedAt, &i.UpdatedAt, &i.ClientName,
+		&i.BankAccountID)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -289,9 +292,10 @@ func (s *Store) SaveDraft(inv *Invoice) error {
 		t := now()
 		if inv.ID == 0 {
 			res, err := tx.Exec(`INSERT INTO invoices(company_id, client_id, status, currency, lang, issue_date, due_date, subtotal,
-				tax_total, total, notes, public_token, recurring_id, reminders_enabled, created_at, updated_at)
-				VALUES(?,?,'draft',?,?,?,?,?,?,?,?,?,?,?,?,?)`, inv.CompanyID, inv.ClientID, inv.Currency, inv.Lang, inv.IssueDate,
-				inv.DueDate, inv.Subtotal, inv.TaxTotal, inv.Total, inv.Notes, inv.PublicToken, inv.RecurringID, b2i(inv.RemindersEnabled), t, t)
+				tax_total, total, notes, public_token, recurring_id, reminders_enabled, bank_account_id, created_at, updated_at)
+				VALUES(?,?,'draft',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, inv.CompanyID, inv.ClientID, inv.Currency, inv.Lang, inv.IssueDate,
+				inv.DueDate, inv.Subtotal, inv.TaxTotal, inv.Total, inv.Notes, inv.PublicToken, inv.RecurringID, b2i(inv.RemindersEnabled),
+				inv.BankAccountID, t, t)
 			if err != nil {
 				return err
 			}
@@ -299,9 +303,9 @@ func (s *Store) SaveDraft(inv *Invoice) error {
 			inv.Status = StatusDraft
 		} else {
 			res, err := tx.Exec(`UPDATE invoices SET client_id=?, currency=?, lang=?, issue_date=?, due_date=?, subtotal=?, tax_total=?,
-				total=?, notes=?, reminders_enabled=?, updated_at=? WHERE id=? AND company_id=? AND status='draft'`,
+				total=?, notes=?, reminders_enabled=?, bank_account_id=?, updated_at=? WHERE id=? AND company_id=? AND status='draft'`,
 				inv.ClientID, inv.Currency, inv.Lang, inv.IssueDate, inv.DueDate, inv.Subtotal, inv.TaxTotal, inv.Total, inv.Notes,
-				b2i(inv.RemindersEnabled), t, inv.ID, inv.CompanyID)
+				b2i(inv.RemindersEnabled), inv.BankAccountID, t, inv.ID, inv.CompanyID)
 			if err != nil {
 				return err
 			}
@@ -378,6 +382,14 @@ func (s *Store) SetRemindersSent(id int64, sent map[int]bool) {
 
 func (s *Store) SetInvoiceReminders(companyID, id int64, enabled bool) error {
 	_, err := s.DB.Exec(`UPDATE invoices SET reminders_enabled = ? WHERE id = ? AND company_id = ?`, b2i(enabled), id, companyID)
+	return err
+}
+
+// SetInvoiceBank changes the bank account shown on a draft or unpaid invoice
+// (payment instructions, not part of the frozen legal content).
+func (s *Store) SetInvoiceBank(companyID, id, choice int64) error {
+	_, err := s.DB.Exec(`UPDATE invoices SET bank_account_id = ?, updated_at = ? WHERE id = ? AND company_id = ? AND status IN ('draft','open')`,
+		choice, now(), id, companyID)
 	return err
 }
 

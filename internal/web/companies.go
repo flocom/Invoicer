@@ -90,6 +90,7 @@ type settingsData struct {
 	Users         []*store.User
 	Members       map[int64]bool
 	Reminders     string
+	Banks         []*store.BankAccount
 }
 
 func (s *Server) companySettings(c *Ctx) error {
@@ -102,6 +103,9 @@ func (s *Server) companySettings(c *Ctx) error {
 	d := &settingsData{Tab: tab, ResendKeySet: len(c.Company.ResendKey) > 0, StripeKeySet: c.Company.HasStripe(),
 		WebhookActive: c.Company.StripeWebhookID != "", WebhookURL: s.App.BaseURL() + "/webhooks/stripe/" + c.Company.PublicID,
 		PublicHTTPS: s.App.IsPublicHTTPS(), Reminders: c.Company.ReminderDays}
+	if tab == "payments" {
+		d.Banks, _ = s.Store.BankAccounts(c.Company.ID)
+	}
 	if tab == "members" {
 		d.Users, _ = s.Store.Users()
 		d.Members, _ = s.Store.CompanyMembers(c.Company.ID)
@@ -244,20 +248,82 @@ func (s *Server) companySaveInvoicing(c *Ctx) error {
 	return c.redirect(c.cpath("/settings?tab=invoicing"))
 }
 
+// companySaveBank stores the "bank details in e-mails" default.
 func (s *Server) companySaveBank(c *Ctx) error {
-	co := c.Company
-	co.BankHolder = clip(c.form("bank_holder"), 200)
-	co.BankName = clip(c.form("bank_name"), 200)
-	co.IBAN = clip(strings.ToUpper(strings.ReplaceAll(c.form("iban"), " ", "")), 40)
-	co.BIC = clip(strings.ToUpper(strings.ReplaceAll(c.form("bic"), " ", "")), 15)
-	co.BankExtra = clip(c.form("bank_extra"), 600)
-	co.EmailBankDetails = c.form("email_bank_details") == "1"
-	if err := s.Store.UpdateCompanyBank(co); err != nil {
+	if err := s.Store.SetEmailBankDetails(c.Company.ID, c.form("email_bank_details") == "1"); err != nil {
 		return err
 	}
-	c.audit("company.settings", "bank")
+	c.audit("company.settings", "bank e-mail option")
 	c.ok("flash.saved")
-	return c.redirect(c.cpath("/settings?tab=payments"))
+	return c.redirect(c.cpath("/settings?tab=payments#banks"))
+}
+
+// bankFromForm validates a bank account form.
+func bankFromForm(c *Ctx, b *store.BankAccount) string {
+	b.Label = clip(c.form("label"), 80)
+	b.Currency = c.form("currency")
+	b.Holder = clip(c.form("holder"), 200)
+	b.BankName = clip(c.form("bank_name"), 200)
+	b.IBAN = clip(strings.ToUpper(strings.ReplaceAll(c.form("iban"), " ", "")), 40)
+	b.BIC = clip(strings.ToUpper(strings.ReplaceAll(c.form("bic"), " ", "")), 15)
+	b.Extra = clip(c.form("extra"), 600)
+	switch {
+	case !money.ValidCurrency(b.Currency):
+		return "err.currency"
+	case b.IBAN == "" && b.Extra == "":
+		return "err.bank_empty"
+	case b.IBAN != "" && !store.ValidIBAN(b.IBAN):
+		return "err.iban"
+	case b.BIC != "" && !bicRe.MatchString(b.BIC):
+		return "err.bic"
+	}
+	return ""
+}
+
+var bicRe = regexp.MustCompile(`^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$`)
+
+func (s *Server) bankCreate(c *Ctx) error {
+	b := &store.BankAccount{CompanyID: c.Company.ID}
+	if key := bankFromForm(c, b); key != "" {
+		c.bad(key)
+		return c.redirect(c.cpath("/settings?tab=payments#banks"))
+	}
+	if err := s.Store.SaveBankAccount(b); err != nil {
+		return err
+	}
+	c.audit("bank.created", b.Name())
+	c.ok("bank.saved")
+	return c.redirect(c.cpath("/settings?tab=payments#banks"))
+}
+
+func (s *Server) bankUpdate(c *Ctx) error {
+	b, err := s.Store.BankAccount(c.Company.ID, c.id("bid"))
+	if err != nil {
+		return err
+	}
+	if key := bankFromForm(c, b); key != "" {
+		c.bad(key)
+		return c.redirect(c.cpath("/settings?tab=payments#banks"))
+	}
+	if err := s.Store.SaveBankAccount(b); err != nil {
+		return err
+	}
+	c.audit("bank.updated", b.Name())
+	c.ok("bank.saved")
+	return c.redirect(c.cpath("/settings?tab=payments#banks"))
+}
+
+func (s *Server) bankDelete(c *Ctx) error {
+	b, err := s.Store.BankAccount(c.Company.ID, c.id("bid"))
+	if err != nil {
+		return err
+	}
+	if err := s.Store.DeleteBankAccount(c.Company.ID, b.ID); err != nil {
+		return err
+	}
+	c.audit("bank.deleted", b.Name())
+	c.ok("bank.deleted")
+	return c.redirect(c.cpath("/settings?tab=payments#banks"))
 }
 
 func (s *Server) companySaveEmail(c *Ctx) error {

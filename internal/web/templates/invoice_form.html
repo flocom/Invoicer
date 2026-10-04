@@ -30,6 +30,8 @@
     <div class="grid-4">
       <div class="field"><label for="issue_date">{{.T "invoice.issue_date"}}</label><input id="issue_date" name="issue_date" type="date" required value="{{$inv.IssueDate}}" data-issue-date></div>
       <div class="field"><label for="due_date">{{.T "invoice.due_date"}}</label><input id="due_date" name="due_date" type="date" required value="{{$inv.DueDate}}" data-due-date data-terms="{{.Company.PaymentTermsDays}}"></div>
+      {{if $d.Banks}}<div class="field span-2"><label>{{.T "field.bank_account"}}</label>{{template "bankselect" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID)}}
+        <p class="hint">{{.T "bank.choice_hint"}}</p></div>{{end}}
     </div>
   </div>
 

@@ -156,6 +156,7 @@ func (a *App) PDF(co *store.Company, inv *store.Invoice) ([]byte, error) {
 	if co.HasStripe() && inv.Status == store.StatusOpen && a.BaseURL() != "" {
 		in.PayURL = a.PayURL(inv)
 	}
+	in.Bank = a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency)
 	return pdf.Render(in)
 }
 
@@ -220,7 +221,7 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 		withBank = *bank
 	}
 	if withBank && inv.Status == store.StatusOpen && inv.Due() > 0 {
-		c.Bank = BankLines(co, inv, lang)
+		c.Bank = BankLines(a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency), co, inv, lang)
 	}
 	subject, html, text := mailer.Render(c)
 	doc, err := a.PDF(co, inv)
@@ -281,8 +282,8 @@ func (a *App) SendTestEmail(ctx context.Context, co *store.Company, to, lang str
 }
 
 // BankLines lists the bank transfer details shown in e-mails (label, value).
-func BankLines(co *store.Company, inv *store.Invoice, lang string) [][2]string {
-	if !co.HasBank() {
+func BankLines(b *store.BankAccount, co *store.Company, inv *store.Invoice, lang string) [][2]string {
+	if b == nil {
 		return nil
 	}
 	t := func(k string) string { return i18n.T(lang, k) }
@@ -292,11 +293,11 @@ func BankLines(co *store.Company, inv *store.Invoice, lang string) [][2]string {
 			out = append(out, [2]string{k, v})
 		}
 	}
-	add(t("pdf.account_holder"), firstNonEmpty(co.BankHolder, co.DisplayName()))
-	add(t("pdf.bank"), co.BankName)
-	add("IBAN", groupIBAN(co.IBAN))
-	add("BIC / SWIFT", co.BIC)
-	for _, l := range i18n.Lines(co.BankExtra) {
+	add(t("pdf.account_holder"), firstNonEmpty(b.Holder, co.DisplayName()))
+	add(t("pdf.bank"), b.BankName)
+	add("IBAN", groupIBAN(b.IBAN))
+	add("BIC / SWIFT", b.BIC)
+	for _, l := range i18n.Lines(b.Extra) {
 		add("", l)
 	}
 	add(t("pdf.reference"), inv.Number)
