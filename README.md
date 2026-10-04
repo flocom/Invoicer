@@ -1,18 +1,37 @@
+<div align="center">
+
+<img src="docs/images/logo.svg" width="80" alt="Invoicer logo">
+
 # Invoicer
 
-Self-hosted invoicing in a single, hardened Docker container.
+**Beautiful, self-hosted invoicing for freelancers and small businesses.**<br>
+Multi-company · Stripe & bank transfers · Recurring invoices · EN / FR · One container, zero config.
 
-- **Multiple companies**, each with its own clients, numbering, branding, bank details, **Resend** account (e-mails) and **Stripe** account (card payments)
-- **Invoices** with multi-rate VAT, PDF generation, public payment page, SEPA QR code (EUR + IBAN)
-- **Currencies**: EUR, USD, CAD, CHF, GBP
-- **Client language**: each client is EN or FR; invoices, PDFs, e-mails and the payment page follow it. The interface is in English by default (French available per user)
-- **Payments**: Stripe Checkout (detected automatically by webhook, or by polling when the server is not publicly reachable) and bank transfers (recorded manually, partial payments supported)
-- **Recurring invoices** for subscriptions (weekly / monthly / yearly, every N periods, end date or count, automatic sending)
-- **Automatic reminders** before/on/after the due date, on a per-company schedule
-- **Automatic, signed updates** from GitHub releases, with backup and rollback
-- **Zero required configuration**: the public domain is detected from your browser; the database, encryption key and certificates are created on first start
+[![Release](https://img.shields.io/github/v/release/flocom/Invoicer?color=4f46e5&label=release)](https://github.com/flocom/Invoicer/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/flocom/Invoicer/ci.yml?branch=main&label=tests)](https://github.com/flocom/Invoicer/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fflocom%2Finvoicer-2496ed?logo=docker&logoColor=white)](https://github.com/flocom/Invoicer/pkgs/container/invoicer)
+[![Image size](https://img.shields.io/badge/image-~20%20MB-0f766e)](Dockerfile)
+[![License](https://img.shields.io/badge/license-PolyForm%20Internal%20Use-7c3aed)](LICENSE.md)
 
-## Quick start
+[Quick start](#-quick-start) · [Features](#-features) · [Screenshots](#-screenshots) · [Security](#-security) · [Updates](#-updates)
+
+<br>
+
+<img src="docs/images/hero.png" alt="Invoicer dashboard and client payment page" width="100%">
+
+</div>
+
+<br>
+
+## ✨ Why Invoicer?
+
+- **Get paid faster.** Every invoice comes with a branded payment page: your client pays by card in two clicks (Stripe) or by bank transfer with a ready-to-scan SEPA QR code. Payments are detected automatically and a receipt goes out by itself.
+- **Stop chasing clients.** Polite reminders before, on and after the due date are sent for you, in your client's language.
+- **Subscriptions on autopilot.** Recurring invoices are generated, numbered and e-mailed on schedule — weekly, monthly, quarterly, yearly.
+- **All your businesses, one place.** Run several companies side by side, each with its own branding, numbering, bank details, Resend and Stripe accounts.
+- **Yours, really.** Runs on your server in a single ~20 MB container. No subscription, no tracking, no lock-in — your data stays in one SQLite file you can back up anywhere.
+
+## 🚀 Quick start
 
 ```bash
 docker run -d --name invoicer --restart unless-stopped \
@@ -21,13 +40,78 @@ docker run -d --name invoicer --restart unless-stopped \
   ghcr.io/flocom/invoicer:latest
 ```
 
-or, with the provided [docker-compose.yml](docker-compose.yml):
+or with the provided [docker-compose.yml](docker-compose.yml): `docker compose up -d`
 
-```bash
-docker compose up -d
-```
+Open the site and create your account — **the first account becomes the owner** with full control. Create it right after starting the container, before sharing the address.
 
-Then open the site and create your account: the **first account created becomes the owner** and has ultimate control over the instance. Create it right after starting the container, before sharing the address — until then, whoever opens the site first can claim it.
+That's it. No `.env` to fill in: the domain is detected from your browser, and the database, encryption key and certificates are created on first start.
+
+## 🧾 Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Invoicing**
+- Multi-rate VAT and decimal quantities per line
+- Sequential numbering per year (`INV-2026-0001`), immutable once issued
+- Polished PDF with your logo and brand colour
+- **EUR, USD, CAD, CHF, GBP**
+- Drafts, partial payments, voiding, duplication
+
+</td>
+<td width="50%" valign="top">
+
+**Getting paid**
+- Public invoice page with **Pay by card** (Stripe Checkout)
+- Stripe webhook set up automatically — no copy-pasting secrets
+- Bank transfer details + **SEPA QR code** on EUR invoices
+- Automatic receipts, overdue tracking, dashboards
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Automation**
+- Recurring invoices (every N weeks / months / years, end date or count)
+- Reminder schedule per company (e.g. `-3, 0, 7, 15, 30` days)
+- E-mails sent through **each company's own Resend account**
+
+</td>
+<td valign="top">
+
+**Built for teams & clients abroad**
+- Several companies per instance, with member access per company
+- Owner / admin / member roles, invitations, TOTP two-factor auth
+- Each client in **English or French**: PDF, e-mails and payment page follow
+- English interface by default, French available per user
+
+</td>
+</tr>
+</table>
+
+## 📸 Screenshots
+
+<table>
+<tr>
+<td colspan="2"><img src="docs/images/invoice.png" alt="Invoice detail with payments and sharing"><p align="center"><sub>Invoice detail — payments, public link, reminders and activity</sub></p></td>
+</tr>
+<tr>
+<td width="62%"><img src="docs/images/public.png" alt="Client payment page"><p align="center"><sub>What your client sees — pay by card or bank transfer</sub></p></td>
+<td width="38%"><img src="docs/images/pdf.png" alt="French PDF invoice"><p align="center"><sub>PDF in the client's language</sub></p></td>
+</tr>
+<tr>
+<td><img src="docs/images/editor.png" alt="Invoice editor"><p align="center"><sub>Fast editor with live totals</sub></p></td>
+<td><img src="docs/images/recurring.png" alt="Recurring invoices"><p align="center"><sub>Subscriptions on autopilot</sub></p></td>
+</tr>
+<tr>
+<td><img src="docs/images/dashboard-dark.png" alt="Dark mode dashboard"><p align="center"><sub>Automatic dark mode</sub></p></td>
+<td><img src="docs/images/settings-payments.png" alt="Stripe settings"><p align="center"><sub>Connect Stripe with one key</sub></p></td>
+</tr>
+</table>
+
+## ⚙️ Running in production
 
 ### HTTPS
 
@@ -38,7 +122,7 @@ Pick one:
 
 Stripe webhooks are configured automatically when the instance is reachable over public HTTPS. Otherwise (local network, testing) payments are checked every 10 minutes.
 
-## Configuration
+### Configuration
 
 Everything is optional — an empty `.env` works. See [.env.example](.env.example).
 
@@ -54,7 +138,7 @@ Everything is optional — an empty `.env` works. See [.env.example](.env.exampl
 
 Per-company settings (Resend, Stripe, bank details, numbering, reminders…) are managed in the web interface. Secrets are encrypted at rest.
 
-## Setting up a company
+### Setting up a company
 
 1. **Settings → General**: legal name, address, VAT and registration numbers, logo, brand colour.
 2. **Settings → Invoicing**: currency, document language, VAT rate, numbering prefix (`INV-2026-0001`, sequential per year), payment terms, legal footer, bank details, reminder schedule (e.g. `-3,0,7,15,30` days relative to the due date).
@@ -64,7 +148,7 @@ Per-company settings (Resend, Stripe, bank details, numbering, reminders…) are
 
 Issued invoices are immutable (numbering without gaps, buyer/seller details frozen at issue time); void and duplicate an invoice to correct it.
 
-## Security
+## 🔒 Security
 
 - Single static Go binary on a distroless, non-root image (~20 MB), read-only root filesystem, no shell
 - Argon2id password hashing, progressive account lockout, rate limiting, optional TOTP 2FA with recovery codes
@@ -75,7 +159,7 @@ Issued invoices are immutable (numbering without gaps, buyer/seller details froz
 - Stripe webhooks verified (HMAC-SHA256, timestamp tolerance) and re-fetched from the Stripe API
 - Audit log of sensitive actions; the e-mail links use the recorded public URL so a forged `Host` header cannot poison them
 
-## Updates
+## 🔄 Updates
 
 Every release publishes Linux binaries and a `manifest.json` signed with Ed25519. The public key is compiled into Invoicer, so an update is only installed if:
 
@@ -92,7 +176,7 @@ Force it yourself:
 
 Pulling a newer image (`docker compose pull && docker compose up -d`) works too.
 
-## Backups
+## 💾 Backups
 
 The whole state lives in the `/data` volume: `invoicer.db` (SQLite), `master.key` (encryption key — **back it up**, without it stored API keys cannot be decrypted), certificates and installed updates. A consistent backup is written every day to `/data/backups` (14 kept) and before each update.
 
@@ -100,7 +184,7 @@ The whole state lives in the `/data` volume: `invoicer.db` (SQLite), `master.key
 docker run --rm -v invoicer-data:/data -v "$PWD":/out alpine tar czf /out/invoicer-backup.tgz -C /data .
 ```
 
-## Command line
+## 🛠 Command line
 
 ```bash
 docker exec invoicer /app/invoicer version
@@ -108,7 +192,7 @@ docker exec invoicer /app/invoicer update                       # install the la
 docker exec invoicer /app/invoicer reset-password you@example.com  # one-time reset link (e.g. lost owner password)
 ```
 
-## Development
+## 👩‍💻 Development
 
 ```bash
 INVOICER_DATA=./.devdata PORT=8090 go run ./cmd/invoicer
@@ -123,9 +207,7 @@ Commit message keywords: `[skip release]`, `[critical]` (install everywhere imme
 
 The workflow needs the repository secret `RELEASE_SIGNING_KEY` (the private key matching [internal/updater/key.go](internal/updater/key.go)). To rotate keys: `go run ./cmd/release keygen`, put the new public key in `key.go`, publish that release while the secret still holds the old key, then replace the secret with the new private key for the following releases.
 
-The Docker image is pushed to `ghcr.io/flocom/invoicer`. After the first release, make the package public in *GitHub → Packages → invoicer → Package settings*.
-
-## License
+## 📄 License
 
 Invoicer is **source-available** under the [PolyForm Internal Use License 1.0.0](LICENSE.md):
 
@@ -136,7 +218,7 @@ For any other use (reselling, hosting it for customers, white-labelling…), con
 
 ---
 
-### En bref (français)
+### 🇫🇷 En bref
 
 Outil de facturation auto-hébergé, tout-en-un dans un conteneur Docker durci. Multi-entreprises (chacune avec son compte Resend et son compte Stripe), factures PDF en anglais ou en français selon le client, 5 devises, paiements par carte (Stripe) ou virement, factures récurrentes, relances automatiques, mises à jour automatiques signées depuis GitHub. Aucune variable d'environnement obligatoire : lancez le conteneur, ouvrez le site : le premier compte créé devient propriétaire (créez-le dès le démarrage).
 

@@ -44,7 +44,8 @@ func (s *Server) dashboard(c *Ctx) error {
 	setup["client"] = nClients > 0
 	return s.render(c, 200, "dashboard", s.page(c, c.Company.Name, "dashboard", map[string]any{
 		"Stats": st, "Overdue": overdue, "Recent": recent, "Upcoming": upcoming, "Setup": setup,
-		"SetupDone": setup["details"] && setup["email"] && setup["payment"] && setup["client"],
+		// the checklist is for brand-new companies: hide it once invoices exist
+		"SetupDone": (setup["details"] && setup["email"] && setup["payment"] && setup["client"]) || len(recent) > 0,
 		"Chart":     chartBars(st, c.Company.DefaultCurrency, today),
 	}))
 }

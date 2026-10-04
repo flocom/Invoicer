@@ -59,7 +59,7 @@
       <dl class="kv">
         <dt>{{.T "pdf.account_holder"}}</dt><dd>{{if $d.Co.BankHolder}}{{$d.Co.BankHolder}}{{else}}{{$d.Seller.Name}}{{end}}</dd>
         {{if $d.Co.BankName}}<dt>{{.T "pdf.bank"}}</dt><dd>{{$d.Co.BankName}}</dd>{{end}}
-        {{if $d.Co.IBAN}}<dt>IBAN</dt><dd class="mono">{{$d.Co.IBAN}} <button type="button" class="icon-btn" data-copy="{{$d.Co.IBAN}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></dd>{{end}}
+        {{if $d.Co.IBAN}}<dt>IBAN</dt><dd class="mono">{{iban $d.Co.IBAN}} <button type="button" class="icon-btn" data-copy="{{$d.Co.IBAN}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></dd>{{end}}
         {{if $d.Co.BIC}}<dt>BIC / SWIFT</dt><dd class="mono">{{$d.Co.BIC}}</dd>{{end}}
         <dt>{{.T "pdf.reference"}}</dt><dd class="mono"><strong>{{$inv.Number}}</strong></dd>
       </dl>
