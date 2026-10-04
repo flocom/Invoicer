@@ -25,9 +25,48 @@
     </dl>
     {{if $cl.Notes}}<p class="notes">{{$cl.Notes}}</p>{{end}}
   </div>
+  <div class="stack">
   <div class="card flush">
     <div class="card-head pad"><h2>{{.T "nav.invoices"}}</h2></div>
     {{if .Data.Invoices}}{{template "invoice_table" (dict "P" $ "Invoices" .Data.Invoices)}}{{else}}<p class="empty-inline pad">{{.T "client.no_invoices"}}</p>{{end}}
+  </div>
+
+  {{if .Data.Others}}
+  <div class="card flush">
+    <div class="card-head pad"><h2>{{.T "client.other_companies_invoices"}}</h2></div>
+    <div class="table-wrap">
+    <table class="table table-click">
+      <thead><tr><th>{{.T "nav.company"}}</th><th>{{.T "invoice.number"}}</th><th>{{.T "invoice.issue_date"}}</th><th>{{.T "invoice.status"}}</th><th class="r">{{.T "pdf.total"}}</th></tr></thead>
+      <tbody>
+      {{range .Data.Others}}
+      <tr>
+        <td><span class="chip">{{.CompanyName}}</span></td>
+        <td><a class="row-link mono" href="/c/{{.CompanyID}}/invoices/{{.Invoice.ID}}">{{.Invoice.Number}}</a></td>
+        <td class="nowrap">{{$.Date .Invoice.IssueDate}}</td>
+        <td>{{template "badge" (dict "P" $ "S" ($.Status .Invoice))}}</td>
+        <td class="r nowrap"><strong>{{$.Money .Invoice.Total .Invoice.Currency}}</strong></td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {{end}}
+
+  {{if or .Data.Related .Data.CopyTargets}}
+  <div class="card stack small">
+    <h3>{{.T "client.other_companies"}}</h3>
+    {{if .Data.Related}}<p>{{.T "client.also_in"}} {{range $i, $r := .Data.Related}}{{if $i}}, {{end}}<a href="/c/{{$r.CompanyID}}/clients/{{$r.ClientID}}">{{$r.CompanyName}}</a>{{end}}</p>{{end}}
+    {{if .Data.CopyTargets}}
+    <form method="post" action="{{.CPath "/clients/%d/copy" $cl.ID}}" class="row wrap">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <select name="company" aria-label="{{.T "nav.company"}}">{{range .Data.CopyTargets}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+      <button class="btn" type="submit">{{template "icon" "copy"}}{{.T "client.copy_to"}}</button>
+    </form>
+    <p class="hint">{{.T "client.copy_hint"}}</p>
+    {{end}}
+  </div>
+  {{end}}
   </div>
 </div>
 {{end}}

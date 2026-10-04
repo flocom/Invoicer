@@ -111,6 +111,8 @@
         <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <textarea name="message" rows="3" maxlength="2000" placeholder="{{.T "invoice.message_ph"}}"></textarea>
+          {{if .Company.HasBank}}<input type="hidden" name="bank_present" value="1">
+          <label class="check small"><input type="checkbox" name="bank" value="1" {{if .Company.EmailBankDetails}}checked{{end}}> {{.T "invoice.include_bank"}}</label>{{end}}
           <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "action.send"}}</button>
         </form>
       </details>
@@ -141,7 +143,18 @@
       <h3>{{.T "invoice.more"}}</h3>
       <form method="post" action="{{.CPath "/invoices/%d/duplicate" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{template "icon" "copy"}}{{.T "invoice.duplicate"}}</button></form>
       {{if eq $inv.Status "open"}}<form method="post" action="{{.CPath "/invoices/%d/void" $inv.ID}}" data-confirm="{{.T "invoice.void_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{.T "invoice.void"}}</button></form>{{end}}
-      {{if eq $inv.Status "draft"}}<form method="post" action="{{.CPath "/invoices/%d/delete" $inv.ID}}" data-confirm="{{.T "invoice.delete_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{template "icon" "trash"}}{{.T "invoice.delete"}}</button></form>{{end}}
+      {{if eq $inv.Status "draft"}}<form method="post" action="{{.CPath "/invoices/%d/delete" $inv.ID}}" data-confirm="{{.T "invoice.delete_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{template "icon" "trash"}}{{.T "invoice.delete"}}</button></form>
+      {{else if .User.IsAdmin}}
+      <details class="disclosure danger-box">
+        <summary>{{template "icon" "trash"}}{{.T "invoice.destroy"}}</summary>
+        <div class="note warn"><span>{{.T "invoice.destroy_warning"}}</span></div>
+        <form method="post" action="{{.CPath "/invoices/%d/destroy" $inv.ID}}" class="stack" data-confirm="{{.T "invoice.destroy_confirm" $inv.Number}}">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <div class="field"><label for="confirm">{{.T "invoice.destroy_type" $inv.Number}}</label><input id="confirm" name="confirm" required autocomplete="off" class="mono" placeholder="{{$inv.Number}}"></div>
+          <button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{.T "invoice.destroy_button"}}</button>
+        </form>
+      </details>
+      {{end}}
     </div>
   </aside>
 </div>

@@ -40,6 +40,7 @@ type Company struct {
 	StripeAccount       string
 	RemindersEnabled    bool
 	ReminderDays        string
+	EmailBankDetails    bool
 	Archived            bool
 	CreatedAt           int64
 }
@@ -69,7 +70,7 @@ func (c *Company) ReminderOffsets() []int {
 const companyCols = `id, public_id, name, legal_name, address, email, phone, website, tax_id, registration_id, logo, accent_color,
 	default_currency, default_lang, default_tax_bp, invoice_prefix, payment_terms_days, bank_holder, bank_name, iban, bic,
 	bank_extra, default_notes, footer, resend_key, email_from, email_reply_to, email_bcc, stripe_key, stripe_webhook_secret,
-	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at`
+	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at, email_bank_details`
 
 func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 	c := &Company{}
@@ -77,7 +78,7 @@ func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 		&c.RegistrationID, &c.Logo, &c.AccentColor, &c.DefaultCurrency, &c.DefaultLang, &c.DefaultTaxBP, &c.InvoicePrefix,
 		&c.PaymentTermsDays, &c.BankHolder, &c.BankName, &c.IBAN, &c.BIC, &c.BankExtra, &c.DefaultNotes, &c.Footer,
 		&c.ResendKey, &c.EmailFrom, &c.EmailReplyTo, &c.EmailBCC, &c.StripeKey, &c.StripeWebhookSecret, &c.StripeWebhookID,
-		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt)
+		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.EmailBankDetails)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -171,10 +172,20 @@ func (s *Store) UpdateCompanyGeneral(c *Company) error {
 
 func (s *Store) UpdateCompanyInvoicing(c *Company) error {
 	_, err := s.DB.Exec(`UPDATE companies SET default_currency=?, default_lang=?, default_tax_bp=?, invoice_prefix=?,
-		payment_terms_days=?, default_notes=?, footer=?, bank_holder=?, bank_name=?, iban=?, bic=?, bank_extra=?,
-		reminders_enabled=?, reminder_days=? WHERE id=?`,
+		payment_terms_days=?, default_notes=?, footer=?, reminders_enabled=?, reminder_days=? WHERE id=?`,
 		c.DefaultCurrency, c.DefaultLang, c.DefaultTaxBP, c.InvoicePrefix, c.PaymentTermsDays, c.DefaultNotes, c.Footer,
-		c.BankHolder, c.BankName, c.IBAN, c.BIC, c.BankExtra, b2i(c.RemindersEnabled), c.ReminderDays, c.ID)
+		b2i(c.RemindersEnabled), c.ReminderDays, c.ID)
+	return err
+}
+
+func (s *Store) UpdateCompanyBank(c *Company) error {
+	_, err := s.DB.Exec(`UPDATE companies SET bank_holder=?, bank_name=?, iban=?, bic=?, bank_extra=?, email_bank_details=? WHERE id=?`,
+		c.BankHolder, c.BankName, c.IBAN, c.BIC, c.BankExtra, b2i(c.EmailBankDetails), c.ID)
+	return err
+}
+
+func (s *Store) SetCompanyAccent(id int64, color string) error {
+	_, err := s.DB.Exec(`UPDATE companies SET accent_color = ? WHERE id = ?`, color, id)
 	return err
 }
 
@@ -385,4 +396,101 @@ func idsArgs(ids []int64) []any {
 		out[i] = id
 	}
 	return out
+}
+
+// ---------- client copies across companies ----------
+
+// RelatedClient is the same customer (same e-mail, or same name when there is
+// no e-mail) in another company the user can access.
+type RelatedClient struct {
+	CompanyID   int64
+	CompanyName string
+	ClientID    int64
+}
+
+func (s *Store) RelatedClients(u *User, cl *Client) ([]RelatedClient, error) {
+	cos, err := s.CompaniesFor(u, false)
+	if err != nil {
+		return nil, err
+	}
+	var out []RelatedClient
+	for _, co := range cos {
+		if co.ID == cl.CompanyID {
+			continue
+		}
+		var id int64
+		var err error
+		if strings.TrimSpace(cl.Email) != "" {
+			err = s.DB.QueryRow(`SELECT id FROM clients WHERE company_id = ? AND email = ? COLLATE NOCASE ORDER BY archived, id LIMIT 1`,
+				co.ID, strings.TrimSpace(cl.Email)).Scan(&id)
+		} else {
+			err = s.DB.QueryRow(`SELECT id FROM clients WHERE company_id = ? AND email = '' AND name = ? COLLATE NOCASE ORDER BY archived, id LIMIT 1`,
+				co.ID, cl.Name).Scan(&id)
+		}
+		if err == nil {
+			out = append(out, RelatedClient{CompanyID: co.ID, CompanyName: co.Name, ClientID: id})
+		}
+	}
+	return out, nil
+}
+
+// CopyClient duplicates a client into another company and returns the copy.
+func (s *Store) CopyClient(src *Client, targetCompany int64) (*Client, error) {
+	c := *src
+	c.ID = 0
+	c.CompanyID = targetCompany
+	c.Archived = false
+	if err := s.SaveClient(&c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// ---------- line suggestions ----------
+
+// LineSuggestion is a previously invoiced product or service.
+type LineSuggestion struct {
+	Description string `json:"description"`
+	UnitPrice   int64  `json:"-"`
+	TaxBP       int64  `json:"-"`
+	Currency    string `json:"currency"`
+	Price       string `json:"price"`
+	Tax         string `json:"tax"`
+}
+
+// LineSuggestions returns distinct descriptions matching q (most recent use
+// first) with the last price and tax rate used.
+func (s *Store) LineSuggestions(companyID int64, q string, limit int) ([]LineSuggestion, error) {
+	like := "%" + escapeLike(strings.TrimSpace(q)) + "%"
+	rows, err := s.DB.Query(`SELECT description, unit_price, tax_bp, currency FROM (
+			SELECT l.description, l.unit_price, l.tax_bp, i.currency, i.updated_at AS t, l.id AS lid
+			FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id
+			WHERE i.company_id = ? AND l.description LIKE ? ESCAPE '\'
+			UNION ALL
+			SELECT l.description, l.unit_price, l.tax_bp, r.currency, r.created_at AS t, l.id AS lid
+			FROM recurring_lines l JOIN recurring r ON r.id = l.recurring_id
+			WHERE r.company_id = ? AND l.description LIKE ? ESCAPE '\'
+		) ORDER BY t DESC, lid DESC LIMIT 300`, companyID, like, companyID, like)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	var out []LineSuggestion
+	for rows.Next() {
+		var l LineSuggestion
+		if err := rows.Scan(&l.Description, &l.UnitPrice, &l.TaxBP, &l.Currency); err != nil {
+			return nil, err
+		}
+		k := strings.ToLower(strings.TrimSpace(l.Description))
+		if seen[k] || k == "" {
+			continue
+		}
+		seen[k] = true
+		out = append(out, l)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, rows.Err()
 }

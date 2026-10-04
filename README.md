@@ -55,7 +55,8 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 **Invoicing**
 - Multi-rate VAT and decimal quantities per line
 - Sequential numbering per year (`INV-2026-0001`), immutable once issued
-- Polished PDF with your logo and brand colour
+- Polished PDF with your logo; the brand colour is detected from the logo and darkened automatically when needed so text stays readable
+- Products & services autocomplete from what you already invoiced (description, price, VAT)
 - **EUR, USD, CAD, CHF, GBP**
 - Drafts, partial payments, voiding, duplication
 
@@ -65,7 +66,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 **Getting paid**
 - Public invoice page with **Pay by card** (Stripe Checkout)
 - Stripe webhook set up automatically — no copy-pasting secrets
-- Bank transfer details + **SEPA QR code** on EUR invoices
+- Bank transfer details + **SEPA QR code** on EUR invoices, optionally included in e-mails
 - Automatic receipts, overdue tracking, dashboards
 
 </td>
@@ -82,7 +83,8 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 <td valign="top">
 
 **Built for teams & clients abroad**
-- Several companies per instance, with member access per company
+- Several companies per instance, with member access per company; copy a client to another company and see all their invoices in one place
+- Address autocomplete: Swiss addresses from **swisstopo**, the rest of the world from **OpenStreetMap** or **Google Maps** (your key), queried by the server
 - Owner / admin / member roles, invitations, TOTP two-factor auth
 - Each client in **English or French**: PDF, e-mails and payment page follow
 - English interface by default, French available per user
@@ -146,7 +148,9 @@ Per-company settings (Resend, Stripe, bank details, numbering, reminders…) are
 4. **Settings → Payments**: a Stripe secret key, or better a *restricted* key with write access to *Checkout Sessions* and *Webhook Endpoints*. The webhook is created for you.
 5. **Settings → Access**: choose which members can see the company.
 
-Issued invoices are immutable (numbering without gaps, buyer/seller details frozen at issue time); void and duplicate an invoice to correct it.
+Issued invoices are immutable (numbering without gaps, buyer/seller details frozen at issue time); void and duplicate an invoice to correct it. Administrators can still delete an issued invoice after a legal warning (deleting invoices is prohibited in most countries; the deletion is recorded in the audit log).
+
+Address autocomplete is configured in **System → Address autocomplete** (swisstopo + OpenStreetMap by default, Google Maps with a *Places API (New)* key, or off).
 
 ## 🔒 Security
 

@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/flocom/invoicer/internal/config"
+	"github.com/flocom/invoicer/internal/geo"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/mailer"
 	"github.com/flocom/invoicer/internal/money"
@@ -178,7 +180,8 @@ var ErrNoRecipient = errors.New("the client has no e-mail address")
 // SendInvoiceEmail sends the invoice (kind "invoice") or a reminder
 // ("reminder_before", "reminder_due", "reminder_overdue") with the PDF
 // attached. Drafts are issued first.
-func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *store.Invoice, kind, message string, userID int64, idemKey string) error {
+// bank overrides the company's "bank details in e-mails" option (nil = default).
+func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *store.Invoice, kind, message string, userID int64, idemKey string, bank *bool) error {
 	if !co.HasResend() {
 		return ErrNoEmail
 	}
@@ -211,6 +214,13 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 	}
 	if inv.Status == store.StatusPaid {
 		c.Amount = money.Format(inv.Total, inv.Currency, lang)
+	}
+	withBank := co.EmailBankDetails
+	if bank != nil {
+		withBank = *bank
+	}
+	if withBank && inv.Status == store.StatusOpen && inv.Due() > 0 {
+		c.Bank = BankLines(co, inv, lang)
 	}
 	subject, html, text := mailer.Render(c)
 	doc, err := a.PDF(co, inv)
@@ -268,6 +278,77 @@ func (a *App) SendTestEmail(ctx context.Context, co *store.Company, to, lang str
 	}
 	a.Store.LogEmail(log)
 	return err
+}
+
+// BankLines lists the bank transfer details shown in e-mails (label, value).
+func BankLines(co *store.Company, inv *store.Invoice, lang string) [][2]string {
+	if !co.HasBank() {
+		return nil
+	}
+	t := func(k string) string { return i18n.T(lang, k) }
+	var out [][2]string
+	add := func(k, v string) {
+		if strings.TrimSpace(v) != "" {
+			out = append(out, [2]string{k, v})
+		}
+	}
+	add(t("pdf.account_holder"), firstNonEmpty(co.BankHolder, co.DisplayName()))
+	add(t("pdf.bank"), co.BankName)
+	add("IBAN", groupIBAN(co.IBAN))
+	add("BIC / SWIFT", co.BIC)
+	for _, l := range i18n.Lines(co.BankExtra) {
+		add("", l)
+	}
+	add(t("pdf.reference"), inv.Number)
+	return out
+}
+
+func groupIBAN(s string) string {
+	s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && i%4 == 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// ---------- address autocomplete ----------
+
+func (a *App) AddressConfig() geo.Config {
+	cfg := geo.Config{Swisstopo: a.Store.Setting("addr_swisstopo") != "0", Provider: a.Store.Setting("addr_provider")}
+	if cfg.Provider == "" {
+		cfg.Provider = geo.ProviderOSM
+	}
+	if raw := a.Store.Setting("google_maps_key"); raw != "" {
+		if b, err := base64.StdEncoding.DecodeString(raw); err == nil {
+			cfg.GoogleKey, _ = a.Box.Open(b, "system:google_maps")
+		}
+	}
+	return cfg
+}
+
+// SaveAddressConfig stores the setup; an empty key keeps the current one.
+func (a *App) SaveAddressConfig(swisstopo bool, provider, googleKey string, removeKey bool) error {
+	sw := "1"
+	if !swisstopo {
+		sw = "0"
+	}
+	if err := a.Store.SetSetting("addr_swisstopo", sw); err != nil {
+		return err
+	}
+	if err := a.Store.SetSetting("addr_provider", provider); err != nil {
+		return err
+	}
+	switch {
+	case removeKey:
+		return a.Store.SetSetting("google_maps_key", "")
+	case googleKey != "":
+		return a.Store.SetSetting("google_maps_key", base64.StdEncoding.EncodeToString(a.Box.Seal(googleKey, "system:google_maps")))
+	}
+	return nil
 }
 
 func splitEmails(s string) []string {

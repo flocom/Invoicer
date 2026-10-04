@@ -254,4 +254,9 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX audit_log_time ON audit_log(created_at);
 `,
+	// 2 — bank details in e-mails, faster line suggestions
+	`
+ALTER TABLE companies ADD COLUMN email_bank_details INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX clients_email ON clients(email COLLATE NOCASE);
+`,
 }

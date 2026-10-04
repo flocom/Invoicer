@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flocom/invoicer/internal/brand"
 	"github.com/flocom/invoicer/internal/config"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/money"
@@ -57,7 +58,8 @@ var funcs = template.FuncMap{
 		}
 		return "?"
 	},
-	"sub100": func(v int) int { return 100 - v },
+	"sub100":   func(v int) int { return 100 - v },
+	"readable": brand.Readable,
 	"iban": func(s string) string {
 		s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
 		var b strings.Builder

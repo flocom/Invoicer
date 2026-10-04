@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"net/mail"
+	"strconv"
 	"strings"
 
 	"github.com/flocom/invoicer/internal/i18n"
@@ -35,7 +37,35 @@ func (s *Server) clientView(c *Ctx) error {
 	}
 	out, _ := s.Store.ClientOutstanding(c.Company.ID)
 	cl.Outstanding = out[cl.ID]
-	return s.render(c, 200, "client_view", s.page(c, cl.Name, "clients", map[string]any{"Client": cl, "Invoices": invs}))
+
+	// the same customer in the user's other companies, with their invoices
+	related, _ := s.Store.RelatedClients(c.User, cl)
+	type otherInvoice struct {
+		CompanyID   int64
+		CompanyName string
+		Invoice     *store.Invoice
+	}
+	var others []otherInvoice
+	in := map[int64]bool{c.Company.ID: true}
+	for _, r := range related {
+		in[r.CompanyID] = true
+		list, _, _ := s.Store.Invoices(r.CompanyID, store.InvoiceFilter{ClientID: r.ClientID, Limit: 100, Today: s.App.Today()})
+		for _, inv := range list {
+			if inv.Status != store.StatusDraft {
+				others = append(others, otherInvoice{r.CompanyID, r.CompanyName, inv})
+			}
+		}
+	}
+	var targets []*store.Company
+	if cos, err := s.Store.CompaniesFor(c.User, false); err == nil {
+		for _, co := range cos {
+			if !in[co.ID] {
+				targets = append(targets, co)
+			}
+		}
+	}
+	return s.render(c, 200, "client_view", s.page(c, cl.Name, "clients", map[string]any{"Client": cl, "Invoices": invs,
+		"Related": related, "Others": others, "CopyTargets": targets}))
 }
 
 func (s *Server) clientForm(c *Ctx) error {
@@ -112,6 +142,33 @@ func (s *Server) clientSave(c *Ctx) error {
 		return c.redirect(next + sep + "client=" + itoa(cl.ID))
 	}
 	return c.redirect(c.cpath("/clients/%d", cl.ID))
+}
+
+// clientCopy duplicates the client into another company the user can access.
+func (s *Server) clientCopy(c *Ctx) error {
+	cl, err := s.Store.Client(c.Company.ID, c.id("id"))
+	if err != nil {
+		return err
+	}
+	target, _ := strconv.ParseInt(c.form("company"), 10, 64)
+	if target == c.Company.ID || !s.Store.CanAccessCompany(c.User, target) {
+		return errForbidden
+	}
+	related, _ := s.Store.RelatedClients(c.User, cl)
+	for _, r := range related {
+		if r.CompanyID == target {
+			c.ok("client.already_there", r.CompanyName)
+			return c.redirect(fmt.Sprintf("/c/%d/clients/%d", r.CompanyID, r.ClientID))
+		}
+	}
+	cp, err := s.Store.CopyClient(cl, target)
+	if err != nil {
+		return err
+	}
+	co, _ := s.Store.Company(target)
+	c.audit("client.copied", fmt.Sprintf("%s → %s", cl.Name, co.Name))
+	c.ok("client.copied", co.Name)
+	return c.redirect(fmt.Sprintf("/c/%d/clients/%d", target, cp.ID))
 }
 
 func (s *Server) clientDelete(c *Ctx) error {

@@ -14,6 +14,7 @@ import (
 	"github.com/go-pdf/fpdf"
 	"rsc.io/qr"
 
+	"github.com/flocom/invoicer/internal/brand"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/money"
 	"github.com/flocom/invoicer/internal/store"
@@ -62,7 +63,7 @@ func Render(in Input) ([]byte, error) {
 	inv, co := in.Invoice, in.Company
 	lang := i18n.Norm(inv.Lang)
 	t := func(k string, a ...any) string { return i18n.T(lang, k, a...) }
-	accent := parseHex(co.AccentColor)
+	accent := parseHex(brand.Readable(co.AccentColor)) // white text on it must stay legible
 	fmtAmt := func(v int64) string { return clean(money.Format(v, inv.Currency, lang)) }
 
 	p := fpdf.New("P", "mm", "A4", "")
