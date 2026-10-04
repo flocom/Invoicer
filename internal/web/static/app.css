@@ -182,7 +182,8 @@ code { background: var(--surface-2); padding: .1em .35em; border-radius: 4px; }
 
 /* ---------- forms ---------- */
 .field { display: flex; flex-direction: column; gap: .35rem; min-width: 0; border: 0; margin: 0; padding: 0; }
-.field-inline { flex-direction: row; align-items: center; gap: .75rem; }
+.field-inline { display: flex; flex-direction: row; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.swatch-inline { vertical-align: middle; }
 .align-end { justify-content: flex-end; }
 label, legend { font-weight: 550; font-size: .88rem; color: var(--text-2); }
 legend { padding: 0; margin-bottom: .35rem; }
@@ -368,7 +369,7 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 @media (max-width: 760px) {
   .lines-head { display: none; }
   .line { grid-template-columns: 1fr 1fr 1fr 2.1rem; }
-  .line textarea { grid-column: 1 / -1; }
+  .line textarea, .line .ac-wrap { grid-column: 1 / -1; }
   .line .line-amount { grid-column: 1 / 4; text-align: right; padding-top: 0; }
 }
 .totals { margin: 1rem 0 0 auto; display: flex; flex-direction: column; gap: .35rem; min-width: 260px; max-width: 360px; }
@@ -382,11 +383,24 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 .paper .notes, .public-card .notes { margin-top: 1.25rem; }
 .disclosure { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: .85rem; }
 .disclosure summary { cursor: pointer; font-weight: 600; color: var(--primary); margin-bottom: .85rem; }
+.danger-box summary { color: var(--danger-strong); display: flex; align-items: center; gap: .4rem; }
+.danger-box .note { margin-bottom: .75rem; }
 
 .menu { position: relative; }
 .menu summary { list-style: none; }
 .menu summary::-webkit-details-marker { display: none; }
 .menu-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 300px; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+
+/* ---------- autocomplete ---------- */
+.ac-wrap { position: relative; width: 100%; }
+.ac-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40; max-height: 320px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: .25rem; }
+.ac-item { display: flex; justify-content: space-between; gap: .75rem; padding: .5rem .6rem; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+.ac-item:hover, .ac-item.active { background: var(--primary-soft); color: var(--primary); }
+.ac-meta { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.ac-foot { padding: .35rem .6rem .15rem; font-size: .7rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: .25rem; }
+.line .ac-wrap { min-width: 0; }
+.line .ac-list { right: auto; width: max(100%, min(480px, 86vw)); }
 
 /* ---------- auth & bare pages ---------- */
 .bare-main { max-width: 1040px; margin: 0 auto; padding: 2rem 1rem 4rem; }

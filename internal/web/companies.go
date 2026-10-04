@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"github.com/flocom/invoicer/internal/brand"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/mailer"
 	"github.com/flocom/invoicer/internal/money"
@@ -150,6 +151,15 @@ func (s *Server) companySaveLogo(c *Ctx) error {
 		c.ok("flash.saved")
 		return c.redirect(c.cpath("/settings?tab=general"))
 	}
+	if c.form("detect") == "1" {
+		if col, ok := brand.FromLogo(c.Company.Logo); ok {
+			s.Store.SetCompanyAccent(c.Company.ID, col)
+			c.ok("settings.color_detected", col)
+		} else {
+			c.bad("settings.color_not_detected")
+		}
+		return c.redirect(c.cpath("/settings?tab=general"))
+	}
 	f, _, err := c.R.FormFile("logo")
 	if err != nil {
 		c.bad("err.logo")
@@ -191,7 +201,13 @@ func (s *Server) companySaveLogo(c *Ctx) error {
 		return err
 	}
 	c.audit("company.settings", "logo")
-	c.ok("flash.saved")
+	// the brand colour follows the logo (it can still be changed by hand)
+	if col, ok := brand.FromLogo(buf.Bytes()); ok {
+		s.Store.SetCompanyAccent(c.Company.ID, col)
+		c.ok("settings.logo_color", col)
+	} else {
+		c.ok("flash.saved")
+	}
 	return c.redirect(c.cpath("/settings?tab=general"))
 }
 
@@ -210,11 +226,6 @@ func (s *Server) companySaveInvoicing(c *Ctx) error {
 	}
 	co.DefaultNotes = clip(c.form("default_notes"), 2000)
 	co.Footer = clip(c.form("footer"), 1000)
-	co.BankHolder = clip(c.form("bank_holder"), 200)
-	co.BankName = clip(c.form("bank_name"), 200)
-	co.IBAN = clip(strings.ToUpper(strings.ReplaceAll(c.form("iban"), " ", "")), 40)
-	co.BIC = clip(strings.ToUpper(strings.ReplaceAll(c.form("bic"), " ", "")), 15)
-	co.BankExtra = clip(c.form("bank_extra"), 600)
 	co.RemindersEnabled = c.form("reminders_enabled") == "1"
 	var parts []string
 	seen := map[int]bool{}
@@ -231,6 +242,22 @@ func (s *Server) companySaveInvoicing(c *Ctx) error {
 	c.audit("company.settings", "invoicing")
 	c.ok("flash.saved")
 	return c.redirect(c.cpath("/settings?tab=invoicing"))
+}
+
+func (s *Server) companySaveBank(c *Ctx) error {
+	co := c.Company
+	co.BankHolder = clip(c.form("bank_holder"), 200)
+	co.BankName = clip(c.form("bank_name"), 200)
+	co.IBAN = clip(strings.ToUpper(strings.ReplaceAll(c.form("iban"), " ", "")), 40)
+	co.BIC = clip(strings.ToUpper(strings.ReplaceAll(c.form("bic"), " ", "")), 15)
+	co.BankExtra = clip(c.form("bank_extra"), 600)
+	co.EmailBankDetails = c.form("email_bank_details") == "1"
+	if err := s.Store.UpdateCompanyBank(co); err != nil {
+		return err
+	}
+	c.audit("company.settings", "bank")
+	c.ok("flash.saved")
+	return c.redirect(c.cpath("/settings?tab=payments"))
 }
 
 func (s *Server) companySaveEmail(c *Ctx) error {

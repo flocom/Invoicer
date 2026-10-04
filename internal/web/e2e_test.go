@@ -144,8 +144,10 @@ func TestEndToEnd(t *testing.T) {
 	b.post("/companies/new", url.Values{"name": {"Acme"}, "currency": {"EUR"}, "lang": {"en"}})
 	b.must("Company settings")
 	b.post("/c/1/settings/invoicing", url.Values{"default_currency": {"EUR"}, "default_lang": {"en"}, "default_tax": {"20"},
-		"invoice_prefix": {"AC-"}, "payment_terms_days": {"30"}, "iban": {"FR76 3000 6000 0112 3456 7890 189"}, "bic": {"AGRIFRPP"},
+		"invoice_prefix": {"AC-"}, "payment_terms_days": {"30"},
 		"reminders_enabled": {"1"}, "reminder_days": {"-3, 0, 7, abc"}, "footer": {"Late fee 40 €"}})
+	b.must("Changes saved")
+	b.post("/c/1/settings/bank", url.Values{"iban": {"FR76 3000 6000 0112 3456 7890 189"}, "bic": {"AGRIFRPP"}, "email_bank_details": {"1"}})
 	b.must("Changes saved")
 	co, _ := e.app.Store.Company(1)
 	if co.ReminderDays != "-3,0,7" || co.DefaultTaxBP != 2000 || co.IBAN != "FR7630006000011234567890189" {

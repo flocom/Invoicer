@@ -17,7 +17,8 @@
     <div class="field"><label for="email">{{.T "field.email"}}</label><input id="email" name="email" type="email" maxlength="200" value="{{$cl.Email}}"><p class="hint">{{.T "field.client_email_hint"}}</p></div>
     <div class="field"><label for="cc_emails">{{.T "field.cc"}}</label><input id="cc_emails" name="cc_emails" maxlength="600" value="{{$cl.CCEmails}}"><p class="hint">{{.T "field.cc_hint"}}</p></div>
   </div>
-  <div class="field"><label for="address">{{.T "field.address"}}</label><textarea id="address" name="address" rows="3" maxlength="1000">{{$cl.Address}}</textarea></div>
+  <div class="field"><label for="address">{{.T "field.address"}}</label><textarea id="address" name="address" rows="3" maxlength="1000" data-address autocomplete="off">{{$cl.Address}}</textarea>
+    <p class="hint">{{.T "field.address_hint"}}</p></div>
   <div class="grid-3">
     <div class="field"><label for="tax_id">{{.T "field.tax_id"}}</label><input id="tax_id" name="tax_id" maxlength="60" value="{{$cl.TaxID}}"></div>
     <div class="field"><label for="lang">{{.T "field.doc_language"}}</label>

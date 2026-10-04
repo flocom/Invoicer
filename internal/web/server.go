@@ -113,6 +113,9 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /account/2fa/disable", s.h(s.auth(s.mfaDisable)))
 	m.HandleFunc("POST /account/sessions/revoke", s.h(s.auth(s.revokeSessions)))
 
+	m.HandleFunc("GET /api/address", s.h(s.auth(s.addressSearch)))
+	m.HandleFunc("GET /api/address/place", s.h(s.auth(s.addressPlace)))
+	m.HandleFunc("POST /admin/system/address", s.h(s.owner(s.systemAddress)))
 	m.HandleFunc("GET /companies", s.h(s.auth(s.companyList)))
 	m.HandleFunc("GET /companies/new", s.h(s.admin(s.companyNew)))
 	m.HandleFunc("POST /companies/new", s.h(s.admin(s.companyCreate)))
@@ -143,6 +146,8 @@ func (s *Server) Handler() http.Handler {
 	c("GET /c/{cid}/clients/{id}/edit", s.clientForm)
 	c("POST /c/{cid}/clients/{id}/edit", s.clientSave)
 	c("POST /c/{cid}/clients/{id}/delete", s.clientDelete)
+	c("POST /c/{cid}/clients/{id}/copy", s.clientCopy)
+	c("GET /c/{cid}/api/lines", s.lineSuggest)
 
 	c("GET /c/{cid}/invoices", s.invoiceList)
 	c("GET /c/{cid}/invoices/new", s.invoiceForm)
@@ -171,10 +176,12 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/recurring/{id}/delete", s.recurringDelete)
 	c("POST /c/{cid}/recurring/{id}/run", s.recurringRunNow)
 
+	ca("POST /c/{cid}/invoices/{id}/destroy", s.invoiceDestroy)
 	ca("GET /c/{cid}/settings", s.companySettings)
 	ca("POST /c/{cid}/settings/general", s.companySaveGeneral)
 	ca("POST /c/{cid}/settings/logo", s.companySaveLogo)
 	ca("POST /c/{cid}/settings/invoicing", s.companySaveInvoicing)
+	ca("POST /c/{cid}/settings/bank", s.companySaveBank)
 	ca("POST /c/{cid}/settings/email", s.companySaveEmail)
 	ca("POST /c/{cid}/settings/email/test", s.companyTestEmail)
 	ca("POST /c/{cid}/settings/stripe", s.companySaveStripe)

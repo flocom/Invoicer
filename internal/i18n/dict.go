@@ -16,6 +16,7 @@ func init() {
 	add(settingsUI)
 	add(invoicesUI)
 	add(adminUI)
+	add(featuresUI)
 }
 
 var common = [][3]string{
@@ -596,4 +597,41 @@ var adminUI = [][3]string{
 	{"audit.action", "Action", "Action"},
 	{"audit.details", "Details", "Détails"},
 	{"audit.system", "system", "système"},
+}
+
+var featuresUI = [][3]string{
+	{"settings.email_bank_details", "Include bank transfer details in invoice and reminder e-mails", "Ajouter les coordonnées bancaires aux e-mails de facture et de relance"},
+	{"settings.email_bank_details_hint", "Default for automatic e-mails; it can be changed for each manual send.", "Valeur par défaut des envois automatiques ; modifiable à chaque envoi manuel."},
+	{"field.address_hint", "Start typing: Swiss addresses come from swisstopo, others from OpenStreetMap or Google.", "Commencez à taper : adresses suisses via swisstopo, autres via OpenStreetMap ou Google."},
+	{"client.other_companies_invoices", "Invoices from your other companies", "Factures de vos autres entreprises"},
+	{"client.other_companies", "Other companies", "Autres entreprises"},
+	{"client.also_in", "Also a client of:", "Également client de :"},
+	{"client.copy_to", "Copy to this company", "Copier vers cette entreprise"},
+	{"client.copy_hint", "Creates the same client (details, language, currency) in the selected company. Clients are matched across companies by e-mail.", "Crée le même client (coordonnées, langue, devise) dans l'entreprise choisie. Les clients sont rapprochés entre entreprises par leur e-mail."},
+	{"client.copied", "Client copied to %s.", "Client copié vers %s."},
+	{"client.already_there", "This client already exists in %s.", "Ce client existe déjà dans %s."},
+	{"invoice.include_bank", "Include bank transfer details", "Ajouter les coordonnées bancaires"},
+	{"invoice.destroy", "Delete this invoice", "Supprimer cette facture"},
+	{"invoice.destroy_warning", "Deleting an issued invoice is generally prohibited: invoices must be numbered without gaps and kept for 10 years (France: Commercial Code art. L123-22 and tax rules; Switzerland: CO art. 958f; 6 years in the UK and Canada). The lawful way to cancel it is to void it or issue a credit note. Only delete an invoice that was never sent (for example created by mistake). This is irreversible and recorded in the audit log.", "Supprimer une facture émise est en principe interdit : les factures doivent être numérotées sans rupture et conservées 10 ans (France : art. L123-22 du Code de commerce et règles fiscales ; Suisse : art. 958f CO ; 6 ans au Royaume-Uni et au Canada). Pour l'annuler légalement, utilisez « Annuler la facture » ou émettez un avoir. Ne supprimez qu'une facture jamais envoyée (créée par erreur, par exemple). Action irréversible, inscrite au journal d'audit."},
+	{"invoice.destroy_type", "Type %s to confirm", "Tapez %s pour confirmer"},
+	{"invoice.destroy_button", "I understand, delete permanently", "J'ai compris, supprimer définitivement"},
+	{"invoice.destroy_confirm", "Permanently delete invoice %s? Its number will be missing from the sequence.", "Supprimer définitivement la facture %s ? Son numéro manquera dans la séquence."},
+	{"invoice.destroy_mismatch", "The number typed does not match: nothing was deleted.", "Le numéro saisi ne correspond pas : rien n'a été supprimé."},
+	{"invoice.destroyed", "Invoice %s deleted (recorded in the audit log).", "Facture %s supprimée (inscrite au journal d'audit)."},
+	{"field.accent_color_hint", "Detected automatically from the logo. Invoices and e-mails use a darker shade when needed so text always stays readable.", "Détectée automatiquement à partir du logo. Les factures et e-mails utilisent une teinte plus foncée si nécessaire pour que le texte reste toujours lisible."},
+	{"settings.color_used", "invoices use", "les factures utilisent"},
+	{"settings.detect_color", "Detect colour from logo", "Détecter la couleur du logo"},
+	{"settings.color_detected", "Brand colour set to %s from the logo.", "Couleur de marque définie sur %s à partir du logo."},
+	{"settings.color_not_detected", "No distinctive colour found in the logo (it may be black and white).", "Aucune couleur distinctive trouvée dans le logo (il est peut-être en noir et blanc)."},
+	{"settings.logo_color", "Logo saved; brand colour set to %s.", "Logo enregistré ; couleur de marque définie sur %s."},
+	{"system.address", "Address autocomplete", "Autocomplétion des adresses"},
+	{"system.address_hint", "Suggestions are fetched by this server: browsers never contact these services directly. Only the typed text is sent.", "Les suggestions sont récupérées par ce serveur : les navigateurs ne contactent jamais ces services directement. Seul le texte saisi est transmis."},
+	{"system.address_swisstopo", "Swiss addresses from swisstopo (official building register)", "Adresses suisses via swisstopo (registre officiel des bâtiments)"},
+	{"system.address_world", "Other countries", "Autres pays"},
+	{"system.address_free", "free, no key", "gratuit, sans clé"},
+	{"system.address_key", "API key required", "clé API requise"},
+	{"system.address_off", "No suggestions", "Pas de suggestions"},
+	{"system.google_key", "Google Maps API key", "Clé API Google Maps"},
+	{"system.google_key_hint", "Google Cloud console → enable \"Places API (New)\" → create an API key restricted to that API. Stored encrypted; leave empty to keep the current key.", "Console Google Cloud → activez « Places API (New) » → créez une clé limitée à cette API. Stockée chiffrée ; laissez vide pour conserver la clé actuelle."},
+	{"system.google_key_needed", "Enter a Google Maps API key to use Google.", "Saisissez une clé API Google Maps pour utiliser Google."},
 }

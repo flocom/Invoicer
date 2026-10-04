@@ -327,6 +327,15 @@ func (s *Server) doIssue(c *Ctx, id int64) error {
 
 func (s *Server) invoiceIssue(c *Ctx) error { return s.doIssue(c, c.id("id")) }
 
+// bankChoice reads the "include bank details" checkbox of a send form.
+func bankChoice(c *Ctx) *bool {
+	if c.R.PostForm.Get("bank_present") == "" {
+		return nil // form without the checkbox: company default
+	}
+	v := c.form("bank") == "1"
+	return &v
+}
+
 func (s *Server) doSend(c *Ctx, id int64, message string) error {
 	inv, err := s.Store.Invoice(c.Company.ID, id)
 	if err != nil {
@@ -338,7 +347,7 @@ func (s *Server) doSend(c *Ctx, id int64, message string) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, ""); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, "", bankChoice(c)); err != nil {
 		if errors.Is(err, app.ErrNoEmail) {
 			c.bad("err.no_email_config")
 		} else if errors.Is(err, app.ErrNoRecipient) {
@@ -376,7 +385,7 @@ func (s *Server) invoiceRemind(c *Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, ""); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, "", bankChoice(c)); err != nil {
 		c.flash("err", err.Error())
 	} else {
 		c.audit("invoice.reminder", inv.Number)
@@ -489,6 +498,32 @@ func (s *Server) invoiceDelete(c *Ctx) error {
 	}
 	c.audit("invoice.draft_deleted", itoa(c.id("id")))
 	c.ok("invoice.deleted")
+	return c.redirect(c.cpath("/invoices"))
+}
+
+// invoiceDestroy permanently deletes an issued invoice (administrators only),
+// after the user typed its number to confirm having read the legal warning.
+func (s *Server) invoiceDestroy(c *Ctx) error {
+	inv, err := s.loadInvoice(c)
+	if err != nil {
+		return err
+	}
+	if inv.Status == store.StatusDraft {
+		return s.invoiceDelete(c)
+	}
+	if !strings.EqualFold(strings.TrimSpace(c.form("confirm")), inv.Number) {
+		c.bad("invoice.destroy_mismatch")
+		return c.redirect(c.cpath("/invoices/%d", inv.ID))
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), 20*time.Second)
+	s.App.ExpireSessions(ctx, c.Company, inv.ID, "")
+	cancel()
+	if _, err := s.Store.DeleteInvoice(c.Company.ID, inv.ID); err != nil {
+		return err
+	}
+	c.audit("invoice.deleted_issued", fmt.Sprintf("%s · %s · %s · %s", inv.Number, inv.ClientName,
+		money.Format(inv.Total, inv.Currency, "en"), inv.Status))
+	c.ok("invoice.destroyed", inv.Number)
 	return c.redirect(c.cpath("/invoices"))
 }
 

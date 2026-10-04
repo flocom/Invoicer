@@ -51,6 +51,22 @@
         <p class="hint">{{.T "system.timezone_hint"}}</p></div>
       <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
     </form>
+    <form method="post" action="/admin/system/address" class="card stack" autocomplete="off">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <h2>{{.T "system.address"}}</h2>
+      <p class="hint">{{.T "system.address_hint"}}</p>
+      <label class="check"><input type="checkbox" name="swisstopo" value="1" {{if $d.Address.Swisstopo}}checked{{end}}> {{.T "system.address_swisstopo"}}</label>
+      <fieldset class="field"><legend>{{.T "system.address_world"}}</legend>
+        <label class="check"><input type="radio" name="provider" value="osm" {{if eq $d.Address.Provider "osm"}}checked{{end}}> OpenStreetMap <span class="muted small">({{.T "system.address_free"}})</span></label>
+        <label class="check"><input type="radio" name="provider" value="google" {{if eq $d.Address.Provider "google"}}checked{{end}}> Google Maps <span class="muted small">({{.T "system.address_key"}})</span></label>
+        <label class="check"><input type="radio" name="provider" value="off" {{if eq $d.Address.Provider "off"}}checked{{end}}> {{.T "system.address_off"}}</label>
+      </fieldset>
+      <div class="field"><label for="google_key">{{.T "system.google_key"}}</label>
+        <input id="google_key" name="google_key" type="password" autocomplete="new-password" spellcheck="false" class="mono" placeholder="{{if $d.Address.GoogleKey}}••••••••  ({{.T "settings.key_saved"}}){{else}}AIza…{{end}}">
+        <p class="hint">{{.T "system.google_key_hint"}}</p></div>
+      {{if $d.Address.GoogleKey}}<label class="check"><input type="checkbox" name="remove_key" value="1"> {{.T "settings.remove_key"}}</label>{{end}}
+      <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+    </form>
     <div class="card stack">
       <h2>{{.T "system.backups"}}</h2>
       <p class="hint">{{.T "system.backups_hint" $d.DataDir}}</p>

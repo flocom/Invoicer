@@ -393,6 +393,18 @@ func (s *Store) Void(companyID, id int64) error {
 	return nil
 }
 
+// DeleteInvoice removes an invoice of any status with its lines, payments and
+// checkout sessions. Deleting issued invoices leaves a gap in the numbering;
+// the web layer restricts it to administrators and warns about the law.
+func (s *Store) DeleteInvoice(companyID, id int64) (*Invoice, error) {
+	inv, err := s.Invoice(companyID, id)
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.DB.Exec(`DELETE FROM invoices WHERE id = ? AND company_id = ?`, id, companyID)
+	return inv, err
+}
+
 func (s *Store) DeleteDraft(companyID, id int64) error {
 	res, err := s.DB.Exec(`DELETE FROM invoices WHERE id = ? AND company_id = ? AND status = 'draft'`, id, companyID)
 	if err != nil {

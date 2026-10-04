@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/flocom/invoicer/internal/brand"
 	"github.com/flocom/invoicer/internal/i18n"
 )
 
@@ -22,6 +23,7 @@ type Content struct {
 	DaysLate    int
 	Link        string
 	Message     string // optional custom message from the sender
+	Bank        [][2]string
 }
 
 var accentRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -43,6 +45,12 @@ var tpl = template.Must(template.New("mail").Parse(`<!doctype html>
 <tr><td style="padding:16px 18px;font-size:14px;color:#6b7080">{{.AmountLabel}}</td><td align="right" style="padding:16px 18px;font-size:20px;font-weight:700">{{.Amount}}</td></tr>
 {{if .DueDate}}<tr><td style="padding:0 18px 16px 18px;font-size:14px;color:#6b7080">{{.DueLabel}}</td><td align="right" style="padding:0 18px 16px 18px;font-size:14px">{{.DueDate}}</td></tr>{{end}}
 </table></td></tr>{{end}}
+{{if .Bank}}<tr><td style="padding:16px 32px 0 32px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f6f9;border-radius:10px">
+<tr><td colspan="2" style="padding:14px 18px 6px 18px;font-size:14px;font-weight:700">{{.BankTitle}}</td></tr>
+{{range .Bank}}<tr><td style="padding:3px 18px;font-size:13px;color:#6b7080;white-space:nowrap;vertical-align:top">{{index . 0}}</td><td style="padding:3px 18px 3px 0;font-size:13px;font-family:Menlo,Consolas,monospace">{{index . 1}}</td></tr>{{end}}
+<tr><td colspan="2" style="height:10px;line-height:10px;font-size:0">&nbsp;</td></tr>
+</table></td></tr>{{end}}
 {{if .Link}}<tr><td style="padding:24px 32px 8px 32px" align="center">
 <a href="{{.Link}}" style="display:inline-block;background:{{.Accent}};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:8px">{{.Button}}</a>
 </td></tr>{{end}}
@@ -52,8 +60,8 @@ var tpl = template.Must(template.New("mail").Parse(`<!doctype html>
 
 type view struct {
 	Content
-	Subject, Heading, AmountLabel, DueLabel, Button, Closing string
-	Paragraphs                                               []string
+	Subject, Heading, AmountLabel, DueLabel, Button, Closing, BankTitle string
+	Paragraphs                                                          []string
 }
 
 // Render returns subject, HTML and plain-text bodies.
@@ -61,11 +69,12 @@ func Render(c Content) (subject, html, text string) {
 	l := i18n.Norm(c.Lang)
 	c.Lang = l
 	if !accentRe.MatchString(c.Accent) {
-		c.Accent = "#4338ca"
+		c.Accent = brand.Default
 	}
+	c.Accent = brand.Readable(c.Accent) // white button text stays legible
 	t := func(k string, a ...any) string { return i18n.T(l, k, a...) }
 	v := view{Content: c, AmountLabel: t("mail.amount_due"), DueLabel: t("mail.due_date"), Button: t("mail.view_pay"),
-		Closing: t("mail.closing")}
+		Closing: t("mail.closing"), BankTitle: t("pdf.bank_transfer")}
 	greet := t("mail.hello")
 	if c.ClientName != "" {
 		greet = t("mail.hello_name", c.ClientName)
@@ -114,6 +123,16 @@ func Render(c Content) (subject, html, text string) {
 		tb.WriteString(v.AmountLabel + ": " + c.Amount + "\n")
 		if v.DueDate != "" {
 			tb.WriteString(v.DueLabel + ": " + v.DueDate + "\n")
+		}
+		tb.WriteString("\n")
+	}
+	if len(c.Bank) > 0 {
+		tb.WriteString(v.BankTitle + "\n")
+		for _, b := range c.Bank {
+			if b[0] != "" {
+				tb.WriteString(b[0] + ": ")
+			}
+			tb.WriteString(b[1] + "\n")
 		}
 		tb.WriteString("\n")
 	}

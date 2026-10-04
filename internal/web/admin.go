@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flocom/invoicer/internal/geo"
 	"github.com/flocom/invoicer/internal/security"
 	"github.com/flocom/invoicer/internal/store"
 	"github.com/flocom/invoicer/internal/updater"
@@ -217,6 +218,7 @@ type systemData struct {
 	DataDir   string
 	DetectedO string
 	PublicTLS bool
+	Address   geo.Config
 }
 
 type backupInfo struct {
@@ -233,7 +235,7 @@ var commonZones = []string{"UTC", "Europe/Paris", "Europe/London", "Europe/Bruss
 
 func (s *Server) systemPage(c *Ctx) error {
 	d := &systemData{Timezone: s.App.Location().String(), Zones: commonZones, DataDir: s.App.Cfg.DataDir,
-		DetectedO: s.detectOrigin(c.R), PublicTLS: s.App.IsPublicHTTPS()}
+		DetectedO: s.detectOrigin(c.R), PublicTLS: s.App.IsPublicHTTPS(), Address: s.App.AddressConfig()}
 	if s.App.Updater != nil {
 		d.Update = s.App.Updater.Status()
 	}

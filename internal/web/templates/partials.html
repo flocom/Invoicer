@@ -32,14 +32,14 @@
 
 {{define "lines"}}
 {{$p := .P}}
-<div class="lines" data-lines data-currency="{{.Currency}}" data-lang="{{$p.Lang}}">
+<div class="lines" data-lines data-currency="{{.Currency}}" data-lang="{{$p.Lang}}" data-suggest="{{$p.CPath "/api/lines"}}">
   <div class="lines-head">
     <span>{{$p.T "line.description"}}</span><span>{{$p.T "line.qty"}}</span><span>{{$p.T "line.unit_price"}}</span><span>{{$p.T "line.tax"}}</span><span class="r">{{$p.T "line.amount"}}</span><span></span>
   </div>
   <div class="lines-body" data-lines-body>
     {{range .Lines}}
     <div class="line" data-line>
-      <textarea name="line_desc" rows="1" maxlength="2000" required placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}">{{.Description}}</textarea>
+      <textarea name="line_desc" rows="1" maxlength="2000" required autocomplete="off" data-line-desc placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}">{{.Description}}</textarea>
       <input name="line_qty" inputmode="decimal" value="{{qtyInput .Quantity}}" aria-label="{{$p.T "line.qty"}}" data-qty>
       <input name="line_price" inputmode="decimal" value="{{if .UnitPrice}}{{input .UnitPrice}}{{end}}" placeholder="0.00" aria-label="{{$p.T "line.unit_price"}}" data-price>
       <span class="suffix-input"><input name="line_tax" inputmode="decimal" value="{{rateInput .TaxBP}}" aria-label="{{$p.T "line.tax"}}" data-tax><span>%</span></span>
@@ -50,7 +50,7 @@
   </div>
   <template data-line-template>
     <div class="line" data-line>
-      <textarea name="line_desc" rows="1" maxlength="2000" required placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}"></textarea>
+      <textarea name="line_desc" rows="1" maxlength="2000" required autocomplete="off" data-line-desc placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}"></textarea>
       <input name="line_qty" inputmode="decimal" value="1" aria-label="{{$p.T "line.qty"}}" data-qty>
       <input name="line_price" inputmode="decimal" value="" placeholder="0.00" aria-label="{{$p.T "line.unit_price"}}" data-price>
       <span class="suffix-input"><input name="line_tax" inputmode="decimal" value="{{rateInput .DefaultBP}}" aria-label="{{$p.T "line.tax"}}" data-tax><span>%</span></span>
