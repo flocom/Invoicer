@@ -1,0 +1,148 @@
+{{define "content"}}
+{{$d := .Data}}{{$inv := $d.Invoice}}{{$st := .Status $inv}}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{.CPath "/invoices"}}">← {{.T "nav.invoices"}}</a>
+    <h1>{{if $inv.Number}}{{$inv.Number}}{{else}}{{.T "invoice.draft"}}{{end}} {{template "badge" (dict "P" $ "S" $st)}}</h1>
+    <p class="muted">{{$inv.ClientName}} · {{.Money $inv.Total $inv.Currency}}{{if $inv.RecurringID}} · <a href="{{.CPath "/recurring/%d" $inv.RecurringID}}">{{.T "invoice.from_recurring"}}</a>{{end}}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{.CPath "/invoices/%d/pdf" $inv.ID}}" target="_blank" rel="noopener">{{template "icon" "file"}}{{.T "action.preview_pdf"}}</a>
+    <a class="btn" href="{{.CPath "/invoices/%d/pdf?dl=1" $inv.ID}}">{{template "icon" "download"}}PDF</a>
+    {{if eq $inv.Status "draft"}}
+      <a class="btn" href="{{.CPath "/invoices/%d/edit" $inv.ID}}">{{.T "action.edit"}}</a>
+    {{end}}
+  </div>
+</div>
+
+<div class="detail-grid wide">
+  <div class="stack">
+    {{if eq $inv.Status "draft"}}
+    <div class="card callout">
+      <div><strong>{{.T "invoice.draft_title"}}</strong><p class="muted small">{{.T "invoice.draft_body"}}</p></div>
+      <div class="row wrap">
+        <form method="post" action="{{.CPath "/invoices/%d/issue" $inv.ID}}" data-confirm="{{.T "invoice.issue_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "invoice.issue"}}</button></form>
+        {{if $d.CanSend}}<form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" data-confirm="{{.T "invoice.send_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "invoice.issue_send"}}</button></form>{{end}}
+      </div>
+    </div>
+    {{end}}
+
+    <div class="card paper">
+      <div class="paper-head">
+        <div>
+          <div class="muted small upper">{{.T "pdf.bill_to"}}</div>
+          <strong>{{$d.Buyer.Name}}</strong>
+          {{if $d.Buyer.ContactName}}<div>{{$d.Buyer.ContactName}}</div>{{end}}
+          <div class="muted small">{{range lines $d.Buyer.Address}}{{.}}<br>{{end}}{{$d.Buyer.Email}}</div>
+        </div>
+        <dl class="kv kv-right small">
+          <dt>{{.T "invoice.issue_date"}}</dt><dd>{{.Date $inv.IssueDate}}</dd>
+          <dt>{{.T "invoice.due_date"}}</dt><dd class="{{if eq $st "overdue"}}danger{{end}}">{{.Date $inv.DueDate}}</dd>
+          <dt>{{.T "field.doc_language"}}</dt><dd>{{.TS "lang." $inv.Lang}}</dd>
+        </dl>
+      </div>
+      <div class="table-wrap">
+      <table class="table lines-view">
+        <thead><tr><th>{{.T "line.description"}}</th><th class="r">{{.T "line.qty"}}</th><th class="r">{{.T "line.unit_price"}}</th><th class="r">{{.T "line.tax"}}</th><th class="r">{{.T "line.amount"}}</th></tr></thead>
+        <tbody>
+        {{range $inv.Lines}}<tr><td class="pre">{{.Description}}</td><td class="r">{{$.Qty .Quantity}}</td><td class="r nowrap">{{$.Money .UnitPrice $inv.Currency}}</td><td class="r">{{$.Rate .TaxBP}} %</td><td class="r nowrap">{{$.Money .Amount $inv.Currency}}</td></tr>{{end}}
+        </tbody>
+      </table>
+      </div>
+      <dl class="totals">
+        <div><dt>{{.T "pdf.subtotal"}}</dt><dd>{{.Money $inv.Subtotal $inv.Currency}}</dd></div>
+        {{range $d.TaxGroups}}<div><dt>{{$.T "pdf.tax"}} {{$.Rate .RateBP}} %</dt><dd>{{$.Money .Tax $inv.Currency}}</dd></div>{{end}}
+        <div class="total"><dt>{{.T "pdf.total"}}</dt><dd>{{.Money $inv.Total $inv.Currency}}</dd></div>
+        {{if $inv.AmountPaid}}<div><dt>{{.T "pdf.paid"}}</dt><dd>-{{.Money $inv.AmountPaid $inv.Currency}}</dd></div>
+        <div class="total"><dt>{{.T "pdf.amount_due"}}</dt><dd>{{.Money $inv.Due $inv.Currency}}</dd></div>{{end}}
+      </dl>
+      {{if $inv.Notes}}<p class="notes pre">{{$inv.Notes}}</p>{{end}}
+    </div>
+
+    {{if ne $inv.Status "draft"}}
+    <div class="card">
+      <div class="card-head"><h2>{{.T "invoice.payments"}}</h2></div>
+      {{if $d.Payments}}
+      <table class="table">
+        <tbody>
+        {{range $d.Payments}}
+        <tr>
+          <td class="nowrap">{{$.Date .PaidOn}}</td>
+          <td>{{$.TS "method." .Method}}{{if .Reference}} <span class="muted small mono">{{.Reference}}</span>{{end}}</td>
+          <td class="r nowrap"><strong>{{$.Money .Amount $inv.Currency}}</strong></td>
+          <td class="w1">{{if not .StripeSessionID}}<form method="post" action="{{$.CPath "/invoices/%d/payments/%d/delete" $inv.ID .ID}}" data-confirm="{{$.T "invoice.payment_delete_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="icon-btn" type="submit" aria-label="{{$.T "action.delete"}}">{{template "icon" "trash"}}</button></form>{{end}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+      {{else}}<p class="empty-inline">{{.T "invoice.no_payments"}}</p>{{end}}
+
+      {{if eq $inv.Status "open"}}
+      <details class="disclosure" {{if not $d.Payments}}open{{end}}>
+        <summary>{{.T "invoice.record_payment"}}</summary>
+        <form method="post" action="{{.CPath "/invoices/%d/payments" $inv.ID}}" class="stack">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <div class="grid-4">
+            <div class="field"><label for="amount">{{.T "field.amount"}}</label><span class="suffix-input"><input id="amount" name="amount" inputmode="decimal" required value="{{input $inv.Due}}"><span>{{$inv.Currency}}</span></span></div>
+            <div class="field"><label for="paid_on">{{.T "field.date"}}</label><input id="paid_on" name="paid_on" type="date" value="{{.Today}}"></div>
+            <div class="field"><label for="method">{{.T "field.method"}}</label><select id="method" name="method">{{range methods}}<option value="{{.}}">{{$.TS "method." .}}</option>{{end}}</select></div>
+            <div class="field"><label for="reference">{{.T "field.reference"}}</label><input id="reference" name="reference" maxlength="200"></div>
+          </div>
+          <div class="row wrap">
+            {{if $d.CanSend}}<label class="check"><input type="checkbox" name="receipt" value="1" checked> {{.T "invoice.send_receipt"}}</label>{{end}}
+            <button class="btn btn-primary" type="submit">{{template "icon" "check"}}{{.T "invoice.record"}}</button>
+          </div>
+        </form>
+      </details>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  <aside class="stack">
+    {{if eq $inv.Status "open"}}
+    <div class="card stack">
+      <h3>{{.T "invoice.share"}}</h3>
+      <div class="copy-field"><input readonly value="{{$d.PublicURL}}" aria-label="{{.T "invoice.public_link"}}"><button type="button" class="icon-btn" data-copy="{{$d.PublicURL}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></div>
+      <p class="hint">{{if $d.HasStripe}}{{.T "invoice.share_hint_stripe"}}{{else}}{{.T "invoice.share_hint"}}{{end}}</p>
+      {{if $d.CanSend}}
+      <details class="disclosure">
+        <summary>{{if $inv.SentAt}}{{.T "invoice.resend"}}{{else}}{{.T "invoice.send_email"}}{{end}}</summary>
+        <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <textarea name="message" rows="3" maxlength="2000" placeholder="{{.T "invoice.message_ph"}}"></textarea>
+          <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "action.send"}}</button>
+        </form>
+      </details>
+      <form method="post" action="{{.CPath "/invoices/%d/remind" $inv.ID}}" data-confirm="{{.T "invoice.remind_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-block" type="submit">{{template "icon" "bell"}}{{.T "invoice.send_reminder"}}</button></form>
+      {{else}}
+      <p class="note">{{.T "invoice.email_not_configured"}} {{if .User.IsAdmin}}<a href="{{.CPath "/settings?tab=email"}}">{{.T "action.configure"}}</a>{{end}}</p>
+      {{end}}
+      {{if not $inv.SentAt}}<form method="post" action="{{.CPath "/invoices/%d/mark-sent" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{.T "invoice.mark_sent"}}</button></form>{{end}}
+    </div>
+    {{end}}
+
+    <div class="card stack small">
+      <h3>{{.T "invoice.activity"}}</h3>
+      <ul class="timeline">
+        <li>{{.T "invoice.created_at" (.DateTime $inv.CreatedAt)}}</li>
+        {{if $inv.SentAt}}<li>{{.T "invoice.sent_at" (.DateTime $inv.SentAt)}}</li>{{end}}
+        {{range $d.Emails}}<li class="{{if eq .Status "failed"}}danger{{end}}">{{$.TS "email." .Kind}} → {{.To}} · {{$.DateTime .CreatedAt}}{{if .Error}}<br><span class="small">{{.Error}}</span>{{end}}</li>{{end}}
+        {{if $inv.PaidAt}}<li class="ok">{{.T "invoice.paid_at" (.DateTime $inv.PaidAt)}}</li>{{end}}
+        {{if $inv.VoidedAt}}<li>{{.T "invoice.voided_at" (.DateTime $inv.VoidedAt)}}</li>{{end}}
+      </ul>
+      {{if eq $inv.Status "open"}}
+      <form method="post" action="{{.CPath "/invoices/%d/reminders" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
+        <button class="link small" type="submit">{{if $inv.RemindersEnabled}}{{.T "invoice.reminders_on"}}{{else}}{{.T "invoice.reminders_off"}}{{end}}</button></form>
+      {{end}}
+    </div>
+
+    <div class="card stack small">
+      <h3>{{.T "invoice.more"}}</h3>
+      <form method="post" action="{{.CPath "/invoices/%d/duplicate" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{template "icon" "copy"}}{{.T "invoice.duplicate"}}</button></form>
+      {{if eq $inv.Status "open"}}<form method="post" action="{{.CPath "/invoices/%d/void" $inv.ID}}" data-confirm="{{.T "invoice.void_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{.T "invoice.void"}}</button></form>{{end}}
+      {{if eq $inv.Status "draft"}}<form method="post" action="{{.CPath "/invoices/%d/delete" $inv.ID}}" data-confirm="{{.T "invoice.delete_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{template "icon" "trash"}}{{.T "invoice.delete"}}</button></form>{{end}}
+    </div>
+  </aside>
+</div>
+{{end}}

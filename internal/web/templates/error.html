@@ -1,0 +1,9 @@
+{{define "content"}}
+<div class="auth">
+  <div class="card auth-card center">
+    <p class="error-code">{{.Data.Status}}</p>
+    <h1>{{.Data.Message}}</h1>
+    <p><a class="btn" href="/">{{.T "err.home"}}</a></p>
+  </div>
+</div>
+{{end}}

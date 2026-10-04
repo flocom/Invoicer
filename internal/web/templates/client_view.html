@@ -1,0 +1,33 @@
+{{define "content"}}
+{{$cl := .Data.Client}}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{.CPath "/clients"}}">← {{.T "nav.clients"}}</a>
+    <h1>{{$cl.Name}} {{if $cl.Archived}}<span class="badge badge-void">{{.T "client.archived"}}</span>{{end}}</h1>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{.CPath "/clients/%d/edit" $cl.ID}}">{{.T "action.edit"}}</a>
+    <a class="btn" href="{{.CPath "/recurring/new?client=%d" $cl.ID}}">{{template "icon" "repeat"}}{{.T "recurring.new"}}</a>
+    <a class="btn btn-primary" href="{{.CPath "/invoices/new?client=%d" $cl.ID}}">{{template "icon" "plus"}}{{.T "invoice.new"}}</a>
+  </div>
+</div>
+<div class="detail-grid">
+  <div class="card stack small">
+    <dl class="kv">
+      {{if $cl.ContactName}}<dt>{{.T "field.contact_name"}}</dt><dd>{{$cl.ContactName}}</dd>{{end}}
+      <dt>{{.T "field.email"}}</dt><dd>{{if $cl.Email}}{{$cl.Email}}{{else}}<span class="warn-text">{{.T "client.no_email"}}</span>{{end}}</dd>
+      {{if $cl.CCEmails}}<dt>{{.T "field.cc"}}</dt><dd>{{$cl.CCEmails}}</dd>{{end}}
+      {{if $cl.Address}}<dt>{{.T "field.address"}}</dt><dd>{{range lines $cl.Address}}{{.}}<br>{{end}}</dd>{{end}}
+      {{if $cl.TaxID}}<dt>{{.T "field.tax_id"}}</dt><dd>{{$cl.TaxID}}</dd>{{end}}
+      <dt>{{.T "field.doc_language"}}</dt><dd>{{.TS "lang." $cl.Lang}}</dd>
+      {{if $cl.Currency}}<dt>{{.T "field.currency"}}</dt><dd>{{$cl.Currency}}</dd>{{end}}
+      <dt>{{.T "client.outstanding"}}</dt><dd>{{range .Totals $cl.Outstanding}}{{.}}<br>{{else}}–{{end}}</dd>
+    </dl>
+    {{if $cl.Notes}}<p class="notes">{{$cl.Notes}}</p>{{end}}
+  </div>
+  <div class="card flush">
+    <div class="card-head pad"><h2>{{.T "nav.invoices"}}</h2></div>
+    {{if .Data.Invoices}}{{template "invoice_table" (dict "P" $ "Invoices" .Data.Invoices)}}{{else}}<p class="empty-inline pad">{{.T "client.no_invoices"}}</p>{{end}}
+  </div>
+</div>
+{{end}}

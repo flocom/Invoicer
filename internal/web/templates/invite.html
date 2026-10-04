@@ -1,0 +1,32 @@
+{{define "content"}}
+<div class="auth">
+  <div class="auth-logo">{{template "icon" "file"}} Invoicer</div>
+  <div class="card auth-card">
+    <h1>{{.T "invite.title"}}</h1>
+    <p class="muted">{{.T "invite.intro" .Data.Email}}</p>
+    <form method="post" class="stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div class="field">
+        <label for="name">{{.T "field.your_name"}}</label>
+        <input id="name" name="name" required maxlength="120" value="{{.Data.Name}}" autocomplete="name">
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="password">{{.T "field.password"}}</label>
+          <input id="password" name="password" type="password" required minlength="12" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="password2">{{.T "field.password_confirm"}}</label>
+          <input id="password2" name="password2" type="password" required minlength="12" autocomplete="new-password">
+        </div>
+      </div>
+      <p class="hint">{{.T "field.password_hint"}}</p>
+      <div class="field">
+        <label for="lang">{{.T "field.ui_language"}}</label>
+        <select id="lang" name="lang">{{range langs}}<option value="{{.}}" {{if eq . $.Data.Lang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">{{.T "invite.submit"}}</button>
+    </form>
+  </div>
+</div>
+{{end}}

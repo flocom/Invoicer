@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="auth">
+  <div class="auth-logo">{{template "icon" "file"}} Invoicer</div>
+  <div class="card auth-card">
+    <h1>{{.T "mfa.title"}}</h1>
+    <p class="muted">{{.T "mfa.intro"}}</p>
+    <form method="post" action="/login/2fa" class="stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="next" value="{{.Data.Next}}">
+      <div class="field">
+        <label for="code">{{.T "mfa.code"}}</label>
+        <input id="code" name="code" required autofocus autocomplete="one-time-code" inputmode="numeric" class="mono code-input" maxlength="11">
+        <p class="hint">{{.T "mfa.recovery_hint"}}</p>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">{{.T "mfa.submit"}}</button>
+    </form>
+    <form method="post" action="/logout" class="center"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="link" type="submit">{{.T "mfa.cancel"}}</button></form>
+  </div>
+</div>
+{{end}}

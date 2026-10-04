@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class="page-head">
+  <div><h1>{{.T "nav.recurring"}}</h1><p class="muted">{{.T "recurring.intro"}}</p></div>
+  <div class="actions"><a class="btn btn-primary" href="{{.CPath "/recurring/new"}}">{{template "icon" "plus"}}{{.T "recurring.new"}}</a></div>
+</div>
+{{if .Data}}
+<div class="card flush">
+<div class="table-wrap">
+<table class="table table-click">
+  <thead><tr><th>{{.T "field.name"}}</th><th>{{.T "invoice.client"}}</th><th>{{.T "recurring.frequency"}}</th><th>{{.T "recurring.next_run"}}</th><th>{{.T "invoice.status"}}</th><th class="r">{{.T "recurring.amount"}}</th></tr></thead>
+  <tbody>
+  {{range .Data}}
+  <tr class="{{if not .Active}}is-archived{{end}}">
+    <td><a class="row-link" href="{{$.CPath "/recurring/%d" .ID}}"><strong>{{.Name}}</strong></a>{{if .LastError}}<div class="danger small">{{.LastError}}</div>{{end}}</td>
+    <td>{{.ClientName}}</td>
+    <td>{{if eq .IntervalCount 1}}{{$.TS "every1." .IntervalUnit}}{{else}}{{$.T (printf "everyN.%s" .IntervalUnit) .IntervalCount}}{{end}}</td>
+    <td class="nowrap">{{if .Active}}{{$.Date .NextRun}}{{else}}–{{end}}</td>
+    <td>{{if .Active}}<span class="badge badge-paid">{{$.T "recurring.active"}}</span>{{else}}<span class="badge badge-void">{{$.T "recurring.paused"}}</span>{{end}} {{if .AutoSend}}<span class="chip on">{{$.T "recurring.auto_send_short"}}</span>{{end}}</td>
+    <td class="r nowrap"><strong>{{$.Money .Amount .Currency}}</strong></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+</div>
+{{else}}
+<div class="empty big">{{template "icon" "repeat"}}<h2>{{.T "recurring.empty_title"}}</h2><p class="muted">{{.T "recurring.empty_body"}}</p><a class="btn btn-primary" href="{{.CPath "/recurring/new"}}">{{.T "recurring.new"}}</a></div>
+{{end}}
+{{end}}

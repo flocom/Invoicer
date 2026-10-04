@@ -1,0 +1,73 @@
+{{define "content"}}
+{{$d := .Data}}{{$inv := $d.Invoice}}{{$st := .Status $inv}}
+<div class="public">
+  <header class="public-head">
+    {{if $d.HasLogo}}<img class="public-logo" src="/logo/{{$d.Co.PublicID}}" alt="{{$d.Seller.Name}}">{{else}}<strong class="public-name">{{$d.Seller.Name}}</strong>{{end}}
+  </header>
+
+  {{if and $d.Paid (ne $inv.Status "paid")}}<div class="flash flash-info">{{.T "public.processing"}}</div>{{end}}
+
+  <div class="card public-card">
+    <div class="public-summary">
+      <div>
+        <div class="muted small upper">{{.T "pdf.invoice"}} {{$inv.Number}}</div>
+        <div class="public-amount">{{if eq $inv.Status "paid"}}{{.Money $inv.Total $inv.Currency}}{{else}}{{.Money $inv.Due $inv.Currency}}{{end}}</div>
+        <div>{{template "badge" (dict "P" $ "S" $st)}}
+          {{if eq $inv.Status "open"}}<span class="muted small">{{.T "public.due_on" (.Date $inv.DueDate)}}</span>{{end}}
+          {{if eq $inv.Status "paid"}}<span class="muted small">{{.T "public.thanks"}}</span>{{end}}</div>
+      </div>
+      <div class="public-actions">
+        {{if $d.CanPay}}<a class="btn btn-primary btn-lg" href="/pay/{{$d.Token}}">{{template "icon" "card"}}{{.T "public.pay_card"}}</a>{{end}}
+        <a class="btn" href="/i/{{$d.Token}}/pdf?dl=1">{{template "icon" "download"}}{{.T "public.download"}}</a>
+      </div>
+    </div>
+
+    <div class="paper-head">
+      <div>
+        <div class="muted small upper">{{.T "public.from"}}</div>
+        <strong>{{$d.Seller.Name}}</strong>
+        <div class="muted small">{{range lines $d.Seller.Address}}{{.}}<br>{{end}}{{$d.Seller.Email}}{{if $d.Seller.TaxID}}<br>{{.T "pdf.tax_id"}} {{$d.Seller.TaxID}}{{end}}</div>
+      </div>
+      <div>
+        <div class="muted small upper">{{.T "pdf.bill_to"}}</div>
+        <strong>{{$d.Buyer.Name}}</strong>
+        <div class="muted small">{{range lines $d.Buyer.Address}}{{.}}<br>{{end}}{{if $d.Buyer.TaxID}}{{.T "pdf.tax_id"}} {{$d.Buyer.TaxID}}{{end}}</div>
+      </div>
+      <dl class="kv kv-right small">
+        <dt>{{.T "pdf.issue_date"}}</dt><dd>{{.Date $inv.IssueDate}}</dd>
+        <dt>{{.T "pdf.due_date"}}</dt><dd>{{.Date $inv.DueDate}}</dd>
+      </dl>
+    </div>
+
+    <div class="table-wrap">
+    <table class="table lines-view">
+      <thead><tr><th>{{.T "pdf.description"}}</th><th class="r">{{.T "pdf.qty"}}</th><th class="r">{{.T "pdf.unit_price"}}</th><th class="r">{{.T "pdf.tax"}}</th><th class="r">{{.T "pdf.amount"}}</th></tr></thead>
+      <tbody>{{range $inv.Lines}}<tr><td class="pre">{{.Description}}</td><td class="r">{{$.Qty .Quantity}}</td><td class="r nowrap">{{$.Money .UnitPrice $inv.Currency}}</td><td class="r">{{$.Rate .TaxBP}} %</td><td class="r nowrap">{{$.Money .Amount $inv.Currency}}</td></tr>{{end}}</tbody>
+    </table>
+    </div>
+    <dl class="totals">
+      <div><dt>{{.T "pdf.subtotal"}}</dt><dd>{{.Money $inv.Subtotal $inv.Currency}}</dd></div>
+      {{range $d.TaxGroups}}<div><dt>{{$.T "pdf.tax"}} {{$.Rate .RateBP}} %</dt><dd>{{$.Money .Tax $inv.Currency}}</dd></div>{{end}}
+      <div class="total"><dt>{{.T "pdf.total"}}</dt><dd>{{.Money $inv.Total $inv.Currency}}</dd></div>
+      {{if $inv.AmountPaid}}<div><dt>{{.T "pdf.paid"}}</dt><dd>-{{.Money $inv.AmountPaid $inv.Currency}}</dd></div>
+      <div class="total"><dt>{{.T "pdf.amount_due"}}</dt><dd>{{.Money $inv.Due $inv.Currency}}</dd></div>{{end}}
+    </dl>
+
+    {{if and (eq $inv.Status "open") $d.Co.HasBank}}
+    <div class="bank">
+      <h3>{{.T "pdf.bank_transfer"}}</h3>
+      <dl class="kv">
+        <dt>{{.T "pdf.account_holder"}}</dt><dd>{{if $d.Co.BankHolder}}{{$d.Co.BankHolder}}{{else}}{{$d.Seller.Name}}{{end}}</dd>
+        {{if $d.Co.BankName}}<dt>{{.T "pdf.bank"}}</dt><dd>{{$d.Co.BankName}}</dd>{{end}}
+        {{if $d.Co.IBAN}}<dt>IBAN</dt><dd class="mono">{{$d.Co.IBAN}} <button type="button" class="icon-btn" data-copy="{{$d.Co.IBAN}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></dd>{{end}}
+        {{if $d.Co.BIC}}<dt>BIC / SWIFT</dt><dd class="mono">{{$d.Co.BIC}}</dd>{{end}}
+        <dt>{{.T "pdf.reference"}}</dt><dd class="mono"><strong>{{$inv.Number}}</strong></dd>
+      </dl>
+      {{if $d.Co.BankExtra}}<p class="pre small">{{$d.Co.BankExtra}}</p>{{end}}
+    </div>
+    {{end}}
+    {{if $inv.Notes}}<p class="notes pre">{{$inv.Notes}}</p>{{end}}
+  </div>
+  <footer class="public-foot muted small">{{range lines $d.Co.Footer}}{{.}}<br>{{end}}</footer>
+</div>
+{{end}}

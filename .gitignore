@@ -1,0 +1,5 @@
+.devdata/
+/dist/
+*.db
+.DS_Store
+.claude/

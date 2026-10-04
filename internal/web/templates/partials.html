@@ -1,0 +1,101 @@
+{{define "flash"}}
+{{if .Flash}}<div class="flash flash-{{.Flash.Kind}}" role="status">{{.Flash.Msg}}</div>{{end}}
+{{if .Error}}<div class="flash flash-err" role="alert">{{.Error}}</div>{{end}}
+{{end}}
+
+{{define "status"}}<span class="badge badge-{{.}}">{{.}}</span>{{end}}
+
+{{define "badge"}}<span class="badge badge-{{.S}}">{{.P.TS "status." .S}}</span>{{end}}
+
+{{define "icon"}}<svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+{{- if eq . "home"}}<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>
+{{- else if eq . "file"}}<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>
+{{- else if eq . "users"}}<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>
+{{- else if eq . "repeat"}}<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>
+{{- else if eq . "settings"}}<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+{{- else if eq . "shield"}}<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>
+{{- else if eq . "list"}}<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+{{- else if eq . "server"}}<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>
+{{- else if eq . "user"}}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+{{- else if eq . "logout"}}<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>
+{{- else if eq . "plus"}}<path d="M12 5v14M5 12h14"/>
+{{- else if eq . "send"}}<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>
+{{- else if eq . "download"}}<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>
+{{- else if eq . "copy"}}<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+{{- else if eq . "trash"}}<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/>
+{{- else if eq . "check"}}<path d="M20 6L9 17l-5-5"/>
+{{- else if eq . "x"}}<path d="M18 6L6 18M6 6l12 12"/>
+{{- else if eq . "card"}}<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+{{- else if eq . "bell"}}<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>
+{{- else if eq . "external"}}<path d="M14 3h7v7M10 14L21 3M19 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/>
+{{- end}}</svg>{{end}}
+
+{{define "lines"}}
+{{$p := .P}}
+<div class="lines" data-lines data-currency="{{.Currency}}" data-lang="{{$p.Lang}}">
+  <div class="lines-head">
+    <span>{{$p.T "line.description"}}</span><span>{{$p.T "line.qty"}}</span><span>{{$p.T "line.unit_price"}}</span><span>{{$p.T "line.tax"}}</span><span class="r">{{$p.T "line.amount"}}</span><span></span>
+  </div>
+  <div class="lines-body" data-lines-body>
+    {{range .Lines}}
+    <div class="line" data-line>
+      <textarea name="line_desc" rows="1" maxlength="2000" required placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}">{{.Description}}</textarea>
+      <input name="line_qty" inputmode="decimal" value="{{qtyInput .Quantity}}" aria-label="{{$p.T "line.qty"}}" data-qty>
+      <input name="line_price" inputmode="decimal" value="{{if .UnitPrice}}{{input .UnitPrice}}{{end}}" placeholder="0.00" aria-label="{{$p.T "line.unit_price"}}" data-price>
+      <span class="suffix-input"><input name="line_tax" inputmode="decimal" value="{{rateInput .TaxBP}}" aria-label="{{$p.T "line.tax"}}" data-tax><span>%</span></span>
+      <output class="r line-amount" data-amount></output>
+      <button type="button" class="icon-btn" data-remove-line aria-label="{{$p.T "line.remove"}}">{{template "icon" "x"}}</button>
+    </div>
+    {{end}}
+  </div>
+  <template data-line-template>
+    <div class="line" data-line>
+      <textarea name="line_desc" rows="1" maxlength="2000" required placeholder="{{$p.T "line.description_ph"}}" aria-label="{{$p.T "line.description"}}"></textarea>
+      <input name="line_qty" inputmode="decimal" value="1" aria-label="{{$p.T "line.qty"}}" data-qty>
+      <input name="line_price" inputmode="decimal" value="" placeholder="0.00" aria-label="{{$p.T "line.unit_price"}}" data-price>
+      <span class="suffix-input"><input name="line_tax" inputmode="decimal" value="{{rateInput .DefaultBP}}" aria-label="{{$p.T "line.tax"}}" data-tax><span>%</span></span>
+      <output class="r line-amount" data-amount></output>
+      <button type="button" class="icon-btn" data-remove-line aria-label="{{$p.T "line.remove"}}">{{template "icon" "x"}}</button>
+    </div>
+  </template>
+  <div class="lines-foot">
+    <button type="button" class="btn btn-ghost btn-sm" data-add-line>{{template "icon" "plus"}}{{$p.T "line.add"}}</button>
+    <dl class="totals totals-live">
+      <div><dt>{{$p.T "pdf.subtotal"}}</dt><dd data-subtotal>–</dd></div>
+      <div><dt>{{$p.T "pdf.tax"}}</dt><dd data-taxtotal>–</dd></div>
+      <div class="total"><dt>{{$p.T "pdf.total"}}</dt><dd data-total>–</dd></div>
+    </dl>
+  </div>
+</div>
+{{end}}
+
+{{define "pagehead"}}
+<div class="page-head">
+  <div>
+    {{if .Back}}<a class="back" href="{{.Back}}">← {{.BackLabel}}</a>{{end}}
+    <h1>{{.Title}}</h1>
+    {{if .Sub}}<p class="muted">{{.Sub}}</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "invoice_table"}}
+{{$p := .P}}
+<div class="table-wrap">
+<table class="table table-click">
+  <thead><tr><th>{{$p.T "invoice.number"}}</th><th>{{$p.T "invoice.client"}}</th><th>{{$p.T "invoice.issue_date"}}</th><th>{{$p.T "invoice.due_date"}}</th><th>{{$p.T "invoice.status"}}</th><th class="r">{{$p.T "pdf.total"}}</th></tr></thead>
+  <tbody>
+  {{range .Invoices}}
+  <tr>
+    <td><a href="{{$p.CPath "/invoices/%d" .ID}}" class="row-link">{{if .Number}}<span class="mono">{{.Number}}</span>{{else}}<span class="muted">{{$p.T "invoice.draft"}}</span>{{end}}</a></td>
+    <td>{{.ClientName}}</td>
+    <td class="nowrap">{{$p.Date .IssueDate}}</td>
+    <td class="nowrap">{{$p.Date .DueDate}}</td>
+    <td>{{template "badge" (dict "P" $p "S" ($p.Status .))}}</td>
+    <td class="r nowrap"><strong>{{$p.Money .Total .Currency}}</strong>{{if and (eq .Status "open") .AmountPaid}}<div class="muted small">{{$p.T "invoice.due"}} {{$p.Money .Due .Currency}}</div>{{end}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}

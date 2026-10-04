@@ -1,0 +1,198 @@
+{{define "content"}}
+{{$c := .Company}}{{$d := .Data}}
+<div class="page-head"><div><h1>{{.T "settings.title"}}</h1><p class="muted">{{$c.Name}}</p></div></div>
+<nav class="tabs">
+  <a href="?tab=general" {{if eq $d.Tab "general"}}class="active"{{end}}>{{.T "settings.tab_general"}}</a>
+  <a href="?tab=invoicing" {{if eq $d.Tab "invoicing"}}class="active"{{end}}>{{.T "settings.tab_invoicing"}}</a>
+  <a href="?tab=email" {{if eq $d.Tab "email"}}class="active"{{end}}>{{.T "settings.tab_email"}}{{if not $c.HasResend}}<span class="dot"></span>{{end}}</a>
+  <a href="?tab=payments" {{if eq $d.Tab "payments"}}class="active"{{end}}>{{.T "settings.tab_payments"}}</a>
+  <a href="?tab=members" {{if eq $d.Tab "members"}}class="active"{{end}}>{{.T "settings.tab_members"}}</a>
+</nav>
+
+{{if eq $d.Tab "general"}}
+<div class="settings-grid">
+<form method="post" action="{{.CPath "/settings/general"}}" class="card stack">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>{{.T "settings.identity"}}</h2>
+  <div class="grid-2">
+    <div class="field"><label for="name">{{.T "field.company_name"}}</label><input id="name" name="name" required maxlength="200" value="{{$c.Name}}"></div>
+    <div class="field"><label for="legal_name">{{.T "field.legal_name"}}</label><input id="legal_name" name="legal_name" maxlength="200" value="{{$c.LegalName}}" placeholder="{{$c.Name}}"></div>
+  </div>
+  <div class="field"><label for="address">{{.T "field.address"}}</label><textarea id="address" name="address" rows="3" maxlength="1000">{{$c.Address}}</textarea></div>
+  <div class="grid-3">
+    <div class="field"><label for="email">{{.T "field.email"}}</label><input id="email" name="email" type="email" maxlength="200" value="{{$c.Email}}"></div>
+    <div class="field"><label for="phone">{{.T "field.phone"}}</label><input id="phone" name="phone" maxlength="60" value="{{$c.Phone}}"></div>
+    <div class="field"><label for="website">{{.T "field.website"}}</label><input id="website" name="website" maxlength="200" value="{{$c.Website}}"></div>
+  </div>
+  <div class="grid-2">
+    <div class="field"><label for="tax_id">{{.T "field.tax_id"}}</label><input id="tax_id" name="tax_id" maxlength="60" value="{{$c.TaxID}}"><p class="hint">{{.T "field.tax_id_hint"}}</p></div>
+    <div class="field"><label for="registration_id">{{.T "field.registration_id"}}</label><input id="registration_id" name="registration_id" maxlength="120" value="{{$c.RegistrationID}}"><p class="hint">{{.T "field.registration_hint"}}</p></div>
+  </div>
+  <div class="field field-inline"><label for="accent_color">{{.T "field.accent_color"}}</label><input id="accent_color" name="accent_color" type="color" value="{{$c.AccentColor}}"></div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+</form>
+<div class="stack">
+  <form method="post" action="{{.CPath "/settings/logo"}}" enctype="multipart/form-data" class="card stack">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <h2>{{.T "settings.logo"}}</h2>
+    <div class="logo-preview">{{if $c.Logo}}<img src="{{datauri "image/png" $c.Logo}}" alt="">{{else}}<span class="muted">{{.T "settings.no_logo"}}</span>{{end}}</div>
+    <input type="file" name="logo" accept="image/png,image/jpeg,image/gif">
+    <p class="hint">{{.T "settings.logo_hint"}}</p>
+    <div class="form-actions">
+      <button class="btn" type="submit">{{.T "action.upload"}}</button>
+      {{if $c.Logo}}<button class="btn btn-ghost" type="submit" name="remove" value="1">{{.T "action.remove"}}</button>{{end}}
+    </div>
+  </form>
+  <form method="post" action="{{.CPath "/settings/archive"}}" class="card stack" data-confirm="{{if $c.Archived}}{{.T "settings.unarchive_confirm"}}{{else}}{{.T "settings.archive_confirm"}}{{end}}">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <h2>{{.T "settings.archive"}}</h2>
+    <p class="hint">{{.T "settings.archive_hint"}}</p>
+    {{if $c.Archived}}
+    <input type="hidden" name="archived" value="0"><button class="btn" type="submit">{{.T "settings.unarchive"}}</button>
+    {{else}}
+    <input type="hidden" name="archived" value="1"><button class="btn btn-danger-ghost" type="submit">{{.T "settings.archive"}}</button>
+    {{end}}
+  </form>
+</div>
+</div>
+{{end}}
+
+{{if eq $d.Tab "invoicing"}}
+<form method="post" action="{{.CPath "/settings/invoicing"}}" class="settings-grid">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <div class="card stack">
+    <h2>{{.T "settings.defaults"}}</h2>
+    <div class="grid-2">
+      <div class="field"><label for="default_currency">{{.T "field.default_currency"}}</label>
+        <select id="default_currency" name="default_currency">{{range currencies}}<option {{if eq . $c.DefaultCurrency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
+      <div class="field"><label for="default_lang">{{.T "field.default_doc_lang"}}</label>
+        <select id="default_lang" name="default_lang">{{range langs}}<option value="{{.}}" {{if eq . $c.DefaultLang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select></div>
+    </div>
+    <div class="grid-3">
+      <div class="field"><label for="invoice_prefix">{{.T "field.invoice_prefix"}}</label><input id="invoice_prefix" name="invoice_prefix" maxlength="20" value="{{$c.InvoicePrefix}}" class="mono"><p class="hint">{{.T "field.invoice_prefix_hint" $c.InvoicePrefix}}</p></div>
+      <div class="field"><label for="payment_terms_days">{{.T "field.payment_terms"}}</label><span class="suffix-input"><input id="payment_terms_days" name="payment_terms_days" type="number" min="0" max="365" value="{{$c.PaymentTermsDays}}"><span>{{.T "unit.days"}}</span></span></div>
+      <div class="field"><label for="default_tax">{{.T "field.default_tax"}}</label><span class="suffix-input"><input id="default_tax" name="default_tax" inputmode="decimal" value="{{rateInput $c.DefaultTaxBP}}"><span>%</span></span></div>
+    </div>
+    <div class="field"><label for="default_notes">{{.T "field.default_notes"}}</label><textarea id="default_notes" name="default_notes" rows="3" maxlength="2000">{{$c.DefaultNotes}}</textarea><p class="hint">{{.T "field.default_notes_hint"}}</p></div>
+    <div class="field"><label for="footer">{{.T "field.footer"}}</label><textarea id="footer" name="footer" rows="3" maxlength="1000">{{$c.Footer}}</textarea><p class="hint">{{.T "field.footer_hint"}}</p></div>
+  </div>
+  <div class="stack">
+    <div class="card stack">
+      <h2>{{.T "settings.bank"}}</h2>
+      <p class="hint">{{.T "settings.bank_hint"}}</p>
+      <div class="field"><label for="bank_holder">{{.T "field.account_holder"}}</label><input id="bank_holder" name="bank_holder" maxlength="200" value="{{$c.BankHolder}}"></div>
+      <div class="field"><label for="bank_name">{{.T "field.bank_name"}}</label><input id="bank_name" name="bank_name" maxlength="200" value="{{$c.BankName}}"></div>
+      <div class="grid-2">
+        <div class="field"><label for="iban">IBAN</label><input id="iban" name="iban" maxlength="40" value="{{$c.IBAN}}" class="mono"></div>
+        <div class="field"><label for="bic">BIC / SWIFT</label><input id="bic" name="bic" maxlength="15" value="{{$c.BIC}}" class="mono"></div>
+      </div>
+      <div class="field"><label for="bank_extra">{{.T "field.bank_extra"}}</label><textarea id="bank_extra" name="bank_extra" rows="2" maxlength="600">{{$c.BankExtra}}</textarea><p class="hint">{{.T "field.bank_extra_hint"}}</p></div>
+    </div>
+    <div class="card stack">
+      <h2>{{.T "settings.reminders"}}</h2>
+      <label class="check"><input type="checkbox" name="reminders_enabled" value="1" {{if $c.RemindersEnabled}}checked{{end}}> {{.T "settings.reminders_enabled"}}</label>
+      <div class="field"><label for="reminder_days">{{.T "field.reminder_days"}}</label><input id="reminder_days" name="reminder_days" value="{{$c.ReminderDays}}" class="mono"><p class="hint">{{.T "field.reminder_days_hint"}}</p></div>
+      {{if not $c.HasResend}}<p class="note warn">{{.T "settings.reminders_need_email"}}</p>{{end}}
+    </div>
+  </div>
+  <div class="form-actions sticky-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+</form>
+{{end}}
+
+{{if eq $d.Tab "email"}}
+<div class="settings-grid">
+<form method="post" action="{{.CPath "/settings/email"}}" class="card stack" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>Resend</h2>
+  <p class="hint">{{.T "settings.resend_intro"}}</p>
+  <div class="field">
+    <label for="resend_key">{{.T "field.api_key"}}</label>
+    <input id="resend_key" name="resend_key" type="password" autocomplete="new-password" spellcheck="false" class="mono" placeholder="{{if $d.ResendKeySet}}••••••••••••  ({{.T "settings.key_saved"}}){{else}}re_…{{end}}">
+    <p class="hint">{{.T "settings.key_hint"}}</p>
+  </div>
+  <div class="field"><label for="email_from">{{.T "field.email_from"}}</label><input id="email_from" name="email_from" maxlength="200" value="{{$c.EmailFrom}}" placeholder="{{$c.Name}} &lt;billing@example.com&gt;"><p class="hint">{{.T "field.email_from_hint"}}</p></div>
+  <div class="grid-2">
+    <div class="field"><label for="email_reply_to">{{.T "field.reply_to"}}</label><input id="email_reply_to" name="email_reply_to" type="email" maxlength="200" value="{{$c.EmailReplyTo}}"></div>
+    <div class="field"><label for="email_bcc">{{.T "field.bcc"}}</label><input id="email_bcc" name="email_bcc" maxlength="400" value="{{$c.EmailBCC}}"><p class="hint">{{.T "field.bcc_hint"}}</p></div>
+  </div>
+  {{if $d.ResendKeySet}}<label class="check"><input type="checkbox" name="remove_key" value="1"> {{.T "settings.remove_key"}}</label>{{end}}
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
+</form>
+<div class="stack">
+  <div class="card stack">
+    <h2>{{.T "settings.status"}}</h2>
+    {{if $c.HasResend}}<p class="status-line ok">{{template "icon" "check"}}{{.T "settings.email_ready"}}</p>
+    <form method="post" action="{{.CPath "/settings/email/test"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{template "icon" "send"}}{{.T "settings.send_test" .User.Email}}</button></form>
+    {{else}}<p class="status-line off">{{template "icon" "x"}}{{.T "settings.email_not_ready"}}</p>{{end}}
+  </div>
+  <div class="card stack small">
+    <h3>{{.T "settings.how_to"}}</h3>
+    <ol class="steps">
+      <li>{{.T "settings.resend_step1"}}</li>
+      <li>{{.T "settings.resend_step2"}}</li>
+      <li>{{.T "settings.resend_step3"}}</li>
+    </ol>
+  </div>
+</div>
+</div>
+{{end}}
+
+{{if eq $d.Tab "payments"}}
+<div class="settings-grid">
+<div class="stack">
+<form method="post" action="{{.CPath "/settings/stripe"}}" class="card stack" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>Stripe</h2>
+  <p class="hint">{{.T "settings.stripe_intro"}}</p>
+  {{if $d.StripeKeySet}}
+  <p class="status-line ok">{{template "icon" "check"}}{{.T "settings.stripe_connected_to" $c.StripeAccount}}</p>
+  {{if $d.WebhookActive}}<p class="status-line ok">{{template "icon" "check"}}{{.T "settings.webhook_active"}}</p>
+  {{else}}<p class="status-line warn">{{template "icon" "bell"}}{{.T "settings.webhook_inactive"}}</p>{{end}}
+  {{end}}
+  <div class="field">
+    <label for="stripe_key">{{.T "field.stripe_key"}}</label>
+    <input id="stripe_key" name="stripe_key" type="password" required autocomplete="new-password" spellcheck="false" class="mono" placeholder="{{if $d.StripeKeySet}}••••••••••••  ({{.T "settings.key_saved"}}){{else}}sk_live_… / rk_live_…{{end}}">
+    <p class="hint">{{.T "settings.stripe_key_hint"}}</p>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{if $d.StripeKeySet}}{{.T "settings.stripe_replace"}}{{else}}{{.T "settings.stripe_connect"}}{{end}}</button></div>
+</form>
+{{if $d.StripeKeySet}}
+<form method="post" action="{{.CPath "/settings/stripe/disconnect"}}" class="card" data-confirm="{{.T "settings.stripe_disconnect_confirm"}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <button class="btn btn-danger-ghost" type="submit">{{.T "settings.stripe_disconnect"}}</button>
+</form>
+{{end}}
+</div>
+<div class="card stack small">
+  <h3>{{.T "settings.how_it_works"}}</h3>
+  <ul class="steps">
+    <li>{{.T "settings.stripe_how1"}}</li>
+    <li>{{.T "settings.stripe_how2"}}</li>
+    <li>{{if $d.PublicHTTPS}}{{.T "settings.stripe_how3" $d.WebhookURL}}{{else}}{{.T "settings.stripe_how3_local"}}{{end}}</li>
+    <li>{{.T "settings.stripe_how4"}}</li>
+  </ul>
+  <p class="hint">{{.T "settings.bank_transfer_note"}} <a href="?tab=invoicing">{{.T "settings.tab_invoicing"}}</a></p>
+</div>
+</div>
+{{end}}
+
+{{if eq $d.Tab "members"}}
+<form method="post" action="{{.CPath "/settings/members"}}" class="card stack">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>{{.T "settings.tab_members"}}</h2>
+  <p class="hint">{{.T "settings.members_hint"}}</p>
+  <table class="table">
+    <thead><tr><th></th><th>{{.T "field.name"}}</th><th>{{.T "field.email"}}</th><th>{{.T "field.role"}}</th></tr></thead>
+    <tbody>
+    {{range $d.Users}}
+    <tr>
+      <td class="w1">{{if .IsAdmin}}<input type="checkbox" checked disabled>{{else}}<input type="checkbox" name="members" value="{{.ID}}" {{if index $d.Members .ID}}checked{{end}} aria-label="{{.Name}}">{{end}}</td>
+      <td>{{.Name}}</td><td class="muted">{{.Email}}</td><td>{{$.TS "role." .Role}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button> <a class="btn btn-ghost" href="/admin/users">{{.T "settings.invite_people"}}</a></div>
+</form>
+{{end}}
+{{end}}

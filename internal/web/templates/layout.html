@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<title>{{if .Title}}{{.Title}} · {{end}}Invoicer</title>
+<link rel="icon" href="/static/favicon.svg?v={{.AssetVer}}" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css?v={{.AssetVer}}">
+<script src="/static/app.js?v={{.AssetVer}}" defer></script>
+</head>
+{{if .Bare}}
+<body class="bare">
+<main class="bare-main">
+  {{template "flash" .}}
+  {{template "content" .}}
+</main>
+</body>
+{{else}}
+<body>
+<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true">
+<header class="topbar">
+  <label for="nav-toggle" class="icon-btn" aria-label="{{.T "nav.menu"}}"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></label>
+  <span class="topbar-title">{{if .Company}}{{.Company.Name}}{{else}}Invoicer{{end}}</span>
+</header>
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M10 9h9l4 4v10a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1Z" fill="#fff"/><path d="M12.5 16h7M12.5 19.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Invoicer</span>
+    </a>
+
+    {{if .Companies}}
+    <details class="switcher">
+      <summary>
+        <span class="switcher-label">{{.T "nav.company"}}</span>
+        <span class="switcher-name">{{if .Company}}{{.Company.Name}}{{else}}{{.T "nav.choose_company"}}{{end}}</span>
+      </summary>
+      <div class="switcher-menu">
+        {{range .Companies}}<a href="/c/{{.ID}}" {{if and $.Company (eq .ID $.Company.ID)}}class="active"{{end}}>{{.Name}}</a>{{end}}
+        <a href="/companies" class="muted-link">{{$.T "nav.all_companies"}}</a>
+        {{if $.User.IsAdmin}}<a href="/companies/new" class="muted-link">+ {{$.T "company.new"}}</a>{{end}}
+      </div>
+    </details>
+    {{end}}
+
+    {{if .Company}}
+    <nav class="nav">
+      <a href="{{.CPath ""}}" {{if eq .Nav "dashboard"}}class="active"{{end}}>{{template "icon" "home"}}{{.T "nav.dashboard"}}</a>
+      <a href="{{.CPath "/invoices"}}" {{if eq .Nav "invoices"}}class="active"{{end}}>{{template "icon" "file"}}{{.T "nav.invoices"}}</a>
+      <a href="{{.CPath "/clients"}}" {{if eq .Nav "clients"}}class="active"{{end}}>{{template "icon" "users"}}{{.T "nav.clients"}}</a>
+      <a href="{{.CPath "/recurring"}}" {{if eq .Nav "recurring"}}class="active"{{end}}>{{template "icon" "repeat"}}{{.T "nav.recurring"}}</a>
+      {{if .User.IsAdmin}}<a href="{{.CPath "/settings"}}" {{if eq .Nav "settings"}}class="active"{{end}}>{{template "icon" "settings"}}{{.T "nav.company_settings"}}</a>{{end}}
+    </nav>
+    {{end}}
+
+    <nav class="nav nav-bottom">
+      {{if .User.IsAdmin}}
+      <a href="/admin/users" {{if eq .Nav "users"}}class="active"{{end}}>{{template "icon" "shield"}}{{.T "nav.users"}}</a>
+      <a href="/admin/audit" {{if eq .Nav "audit"}}class="active"{{end}}>{{template "icon" "list"}}{{.T "nav.audit"}}</a>
+      {{end}}
+      {{if .User.IsOwner}}
+      <a href="/admin/system" {{if eq .Nav "system"}}class="active"{{end}}>{{template "icon" "server"}}{{.T "nav.system"}}{{if .UpdateNote}}<span class="dot" title="{{.T "system.update_badge"}}"></span>{{end}}</a>
+      {{end}}
+      <a href="/account" {{if eq .Nav "account"}}class="active"{{end}}>{{template "icon" "user"}}<span class="ellipsis">{{.User.Name}}</span></a>
+      <form method="post" action="/logout" class="nav-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <button type="submit">{{template "icon" "logout"}}{{.T "nav.logout"}}</button>
+      </form>
+      <div class="version">Invoicer {{.Version}}</div>
+    </nav>
+  </aside>
+  <label for="nav-toggle" class="scrim" aria-hidden="true"></label>
+
+  <main class="main">
+    {{if .NewOrigin}}
+    <form method="post" action="/admin/system/domain" class="banner">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="back" value="{{if .Company}}{{.CPath ""}}{{else}}/{{end}}">
+      <span>{{.T "banner.new_origin" .NewOrigin .BaseURL}}</span>
+      <button class="btn btn-sm" type="submit">{{.T "banner.use_origin"}}</button>
+    </form>
+    {{end}}
+    {{if eq .UpdateNote "required"}}
+    <div class="banner banner-warn"><span>{{.T "banner.update_required"}}</span> <a class="btn btn-sm" href="/admin/system">{{.T "nav.system"}}</a></div>
+    {{end}}
+    {{template "flash" .}}
+    {{template "content" .}}
+  </main>
+</div>
+</body>
+{{end}}
+</html>
