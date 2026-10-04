@@ -22,7 +22,9 @@
       <div><strong>{{.T "invoice.draft_title"}}</strong><p class="muted small">{{.T "invoice.draft_body"}}</p></div>
       <div class="row wrap">
         <form method="post" action="{{.CPath "/invoices/%d/issue" $inv.ID}}" data-confirm="{{.T "invoice.issue_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "invoice.issue"}}</button></form>
-        {{if $d.CanSend}}<form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" data-confirm="{{.T "invoice.send_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "invoice.issue_send"}}</button></form>{{end}}
+        {{if $d.CanSend}}<form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack small" data-confirm="{{.T "invoice.send_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
+          {{template "bankmail" (dict "P" $ "Bank" $d.Bank)}}
+          <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "invoice.issue_send"}}</button></form>{{end}}
       </div>
     </div>
     {{end}}
@@ -106,13 +108,12 @@
       <div class="copy-field"><input readonly value="{{$d.PublicURL}}" aria-label="{{.T "invoice.public_link"}}"><button type="button" class="icon-btn" data-copy="{{$d.PublicURL}}" aria-label="{{.T "action.copy"}}">{{template "icon" "copy"}}</button></div>
       <p class="hint">{{if $d.HasStripe}}{{.T "invoice.share_hint_stripe"}}{{else}}{{.T "invoice.share_hint"}}{{end}}</p>
       {{if $d.CanSend}}
-      <details class="disclosure">
+      <details class="disclosure" {{if not $inv.SentAt}}open{{end}}>
         <summary>{{if $inv.SentAt}}{{.T "invoice.resend"}}{{else}}{{.T "invoice.send_email"}}{{end}}</summary>
         <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <textarea name="message" rows="3" maxlength="2000" placeholder="{{.T "invoice.message_ph"}}"></textarea>
-          {{if $d.Bank}}<input type="hidden" name="bank_present" value="1">
-          <label class="check small"><input type="checkbox" name="bank" value="1" {{if .Company.EmailBankDetails}}checked{{end}}> {{.T "invoice.include_bank_named" $d.Bank.Name}}</label>{{end}}
+          {{template "bankmail" (dict "P" $ "Bank" $d.Bank)}}
           <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "action.send"}}</button>
         </form>
       </details>
