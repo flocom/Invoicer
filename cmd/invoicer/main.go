@@ -143,7 +143,7 @@ func serve(cfg config.Config) error {
 		go func() { errc <- s.ListenAndServe() }()
 		slog.Info("listening", "addr", cfg.HTTPAddr)
 	}
-	srv.LogSetupToken()
+	srv.LogFirstRun()
 
 	// SIGHUP (sent by "invoicer update") restarts into the newest installed binary
 	hup := make(chan os.Signal, 1)

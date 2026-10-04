@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/flocom/invoicer/internal/i18n"
@@ -17,32 +16,13 @@ import (
 
 // ---------- first-run setup ----------
 
-var (
-	setupMu    sync.Mutex
-	setupToken string
-)
-
-// SetupToken returns the one-time token required to create the owner
-// account, generating it if needed. It is printed in the container logs so
-// that only someone with access to the server can claim a fresh instance.
-func (s *Server) SetupToken() string {
-	setupMu.Lock()
-	defer setupMu.Unlock()
-	if setupToken == "" {
-		setupToken = security.Code(16)
-	}
-	return setupToken
-}
-
-func (s *Server) LogSetupToken() {
+// LogFirstRun reminds the operator, in the logs, that the instance has no
+// account yet: the first account created becomes the owner.
+func (s *Server) LogFirstRun() {
 	if n, _ := s.Store.UserCount(); n > 0 {
 		return
 	}
-	tok := s.SetupToken()
-	slog.Info("╔══════════════════════════════════════════════════════════╗")
-	slog.Info("  FIRST START — open Invoicer in your browser to create the  ")
-	slog.Info("  owner account. Setup token: " + tok)
-	slog.Info("╚══════════════════════════════════════════════════════════╝")
+	slog.Info("first start: open Invoicer in your browser and create the owner account (the first account gets full control)")
 }
 
 type setupData struct {
@@ -71,9 +51,6 @@ func (s *Server) setupSubmit(c *Ctx) error {
 	if !s.limiter.allow("setup:"+c.IP, 10, 10*time.Minute) {
 		return fail("err.rate_limited")
 	}
-	if !security.Equal(strings.ToUpper(strings.ReplaceAll(c.form("token"), " ", "")), s.SetupToken()) {
-		return fail("err.setup_token")
-	}
 	if d.Name == "" {
 		return fail("err.name_required")
 	}
@@ -97,9 +74,6 @@ func (s *Server) setupSubmit(c *Ctx) error {
 	if tz := c.form("tz"); tz != "" {
 		s.App.SetTimezone(tz)
 	}
-	setupMu.Lock()
-	setupToken = ""
-	setupMu.Unlock()
 	s.Store.Audit(u.ID, 0, c.IP, "setup.owner_created", u.Email)
 	if err := s.startSession(c, u, false); err != nil {
 		return err

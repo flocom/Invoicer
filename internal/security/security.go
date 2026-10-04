@@ -241,7 +241,7 @@ func urlEscape(s string) string {
 }
 
 // Code returns a random string of n characters from an unambiguous
-// upper-case alphabet (used for the setup token).
+// upper-case alphabet.
 func Code(n int) string {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	out := make([]byte, n)
