@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 FROM gcr.io/distroless/static-debian12:nonroot
 LABEL org.opencontainers.image.source="https://github.com/flocom/Invoicer" \
       org.opencontainers.image.description="Self-hosted invoicing: multi-company, Stripe, Resend, recurring invoices" \
-      org.opencontainers.image.licenses="NOASSERTION"
+      org.opencontainers.image.licenses="LicenseRef-PolyForm-Internal-Use-1.0.0"
 COPY --from=build --chown=65532:65532 /out/invoicer /app/invoicer
 COPY --from=build --chown=65532:65532 /out/data /data
 USER 65532:65532

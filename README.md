@@ -127,8 +127,19 @@ Releases are built and signed by [.github/workflows/release.yml](.github/workflo
 
 The Docker image is pushed to `ghcr.io/flocom/invoicer`. After the first release, make the package public in *GitHub → Packages → invoicer → Package settings*.
 
+## License
+
+Invoicer is **source-available** under the [PolyForm Internal Use License 1.0.0](LICENSE.md):
+
+- ✅ free to use, self-host and modify for the internal operations of you and your company (including invoicing your own clients);
+- ❌ no redistribution, resale or sublicensing, and no offering Invoicer as a service to third parties.
+
+For any other use (reselling, hosting it for customers, white-labelling…), contact the author for a commercial license.
+
 ---
 
 ### En bref (français)
 
 Outil de facturation auto-hébergé, tout-en-un dans un conteneur Docker durci. Multi-entreprises (chacune avec son compte Resend et son compte Stripe), factures PDF en anglais ou en français selon le client, 5 devises, paiements par carte (Stripe) ou virement, factures récurrentes, relances automatiques, mises à jour automatiques signées depuis GitHub. Aucune variable d'environnement obligatoire : lancez le conteneur, récupérez le jeton d'installation avec `docker logs invoicer`, et le premier compte créé devient propriétaire.
+
+**Licence :** [PolyForm Internal Use 1.0.0](LICENSE.md) — utilisation, auto-hébergement et modification gratuits pour vos propres besoins et ceux de votre entreprise ; revente, redistribution et offre en tant que service à des tiers interdites sans licence commerciale.
