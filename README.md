@@ -123,7 +123,11 @@ go test ./...
 
 ### Releasing
 
-Releases are built and signed by [.github/workflows/release.yml](.github/workflows/release.yml) when a `v*.*.*` tag is pushed. The workflow needs the repository secret `RELEASE_SIGNING_KEY` (the private key matching [internal/updater/key.go](internal/updater/key.go)). To rotate keys: `go run ./cmd/release keygen`, put the new public key in `key.go`, publish that release while the secret still holds the old key, then replace the secret with the new private key for the following releases.
+Every push to `main` publishes a new version automatically ([.github/workflows/release.yml](.github/workflows/release.yml)): the next tag is computed from the previous one (patch by default, minor for `feat:` commits, major for `BREAKING CHANGE` / `#major`), then the binaries are built, the update manifest is signed, the GitHub release is created and the Docker image is pushed. Running instances pick it up on their next update check.
+
+Commit message keywords: `[skip release]`, `[critical]` (install everywhere immediately), `[min:vX.Y.Z]` (force instances below that version to update).
+
+The workflow needs the repository secret `RELEASE_SIGNING_KEY` (the private key matching [internal/updater/key.go](internal/updater/key.go)). To rotate keys: `go run ./cmd/release keygen`, put the new public key in `key.go`, publish that release while the secret still holds the old key, then replace the secret with the new private key for the following releases.
 
 The Docker image is pushed to `ghcr.io/flocom/invoicer`. After the first release, make the package public in *GitHub → Packages → invoicer → Package settings*.
 
