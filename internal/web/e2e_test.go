@@ -124,11 +124,8 @@ const pw = "correct horse battery staple"
 func setupOwner(t *testing.T, e *env) *browser {
 	b := e.browser()
 	b.get("/")
-	b.must("Setup token")
-	// wrong token is rejected
-	b.post("/setup", url.Values{"token": {"WRONG"}, "name": {"Owner"}, "email": {"owner@example.test"}, "password": {pw}, "password2": {pw}})
-	b.must("Invalid setup token")
-	b.post("/setup", url.Values{"token": {e.web.SetupToken()}, "name": {"Owner"}, "email": {"owner@example.test"},
+	b.must("Welcome to Invoicer")
+	b.post("/setup", url.Values{"name": {"Owner"}, "email": {"owner@example.test"},
 		"password": {pw}, "password2": {pw}, "lang": {"en"}, "tz": {"Europe/Paris"}})
 	b.must("New company")
 	return b

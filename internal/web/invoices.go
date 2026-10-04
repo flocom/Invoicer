@@ -487,4 +487,3 @@ func (s *Server) invoiceToggleReminders(c *Ctx) error {
 	c.ok("flash.saved")
 	return c.redirect(c.cpath("/invoices/%d", inv.ID))
 }
-

@@ -27,13 +27,7 @@ or, with the provided [docker-compose.yml](docker-compose.yml):
 docker compose up -d
 ```
 
-Then open the site and get the **one-time setup token** from the logs:
-
-```bash
-docker logs invoicer
-```
-
-The **first account created becomes the owner** and has ultimate control over the instance. The setup token makes sure nobody else can claim a freshly started server before you.
+Then open the site and create your account: the **first account created becomes the owner** and has ultimate control over the instance. Create it right after starting the container, before sharing the address — until then, whoever opens the site first can claim it.
 
 ### HTTPS
 
@@ -144,6 +138,6 @@ For any other use (reselling, hosting it for customers, white-labelling…), con
 
 ### En bref (français)
 
-Outil de facturation auto-hébergé, tout-en-un dans un conteneur Docker durci. Multi-entreprises (chacune avec son compte Resend et son compte Stripe), factures PDF en anglais ou en français selon le client, 5 devises, paiements par carte (Stripe) ou virement, factures récurrentes, relances automatiques, mises à jour automatiques signées depuis GitHub. Aucune variable d'environnement obligatoire : lancez le conteneur, récupérez le jeton d'installation avec `docker logs invoicer`, et le premier compte créé devient propriétaire.
+Outil de facturation auto-hébergé, tout-en-un dans un conteneur Docker durci. Multi-entreprises (chacune avec son compte Resend et son compte Stripe), factures PDF en anglais ou en français selon le client, 5 devises, paiements par carte (Stripe) ou virement, factures récurrentes, relances automatiques, mises à jour automatiques signées depuis GitHub. Aucune variable d'environnement obligatoire : lancez le conteneur, ouvrez le site : le premier compte créé devient propriétaire (créez-le dès le démarrage).
 
 **Licence :** [PolyForm Internal Use 1.0.0](LICENSE.md) — utilisation, auto-hébergement et modification gratuits pour vos propres besoins et ceux de votre entreprise ; revente, redistribution et offre en tant que service à des tiers interdites sans licence commerciale.

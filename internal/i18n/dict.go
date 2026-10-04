@@ -81,7 +81,6 @@ var common = [][3]string{
 	{"err.not_found", "Page not found.", "Page introuvable."},
 	{"err.internal", "Something went wrong. The error has been logged.", "Une erreur est survenue. Elle a été enregistrée dans les journaux."},
 	{"err.rate_limited", "Too many attempts. Please wait a few minutes.", "Trop de tentatives. Patientez quelques minutes."},
-	{"err.setup_token", "Invalid setup token. Check the container logs.", "Jeton d'installation invalide. Consultez les journaux du conteneur."},
 	{"err.name_required", "A name is required.", "Le nom est obligatoire."},
 	{"err.email_invalid", "Please enter a valid e-mail address.", "Saisissez une adresse e-mail valide."},
 	{"err.email_taken", "A user with this e-mail already exists.", "Un utilisateur avec cet e-mail existe déjà."},
@@ -200,8 +199,6 @@ var ui = [][3]string{
 
 	{"setup.title", "Welcome to Invoicer", "Bienvenue sur Invoicer"},
 	{"setup.intro", "Create the owner account. You can add companies, clients and other users right after.", "Créez le compte propriétaire. Vous pourrez ensuite ajouter des entreprises, des clients et d'autres utilisateurs."},
-	{"setup.token", "Setup token", "Jeton d'installation"},
-	{"setup.token_hint", "Printed in the server logs at first start. Run:", "Affiché dans les journaux du serveur au premier démarrage. Lancez :"},
 	{"setup.owner_note", "This first account becomes the owner, with full control over the instance. Use a strong password and enable two-factor authentication.", "Ce premier compte devient propriétaire, avec le contrôle total de l'instance. Utilisez un mot de passe robuste et activez la double authentification."},
 	{"setup.submit", "Create my account", "Créer mon compte"},
 	{"setup.done", "Your owner account is ready. Let's create your first company.", "Votre compte propriétaire est prêt. Créons votre première entreprise."},

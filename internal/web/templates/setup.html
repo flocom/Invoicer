@@ -8,13 +8,8 @@
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <input type="hidden" name="tz" value="" data-timezone>
       <div class="field">
-        <label for="token">{{.T "setup.token"}}</label>
-        <input id="token" name="token" required autocomplete="off" spellcheck="false" class="mono" placeholder="XXXXXXXXXXXX">
-        <p class="hint">{{.T "setup.token_hint"}} <code>docker logs invoicer</code></p>
-      </div>
-      <div class="field">
         <label for="name">{{.T "field.your_name"}}</label>
-        <input id="name" name="name" required maxlength="120" value="{{.Data.Name}}" autocomplete="name">
+        <input id="name" name="name" required maxlength="120" value="{{.Data.Name}}" autocomplete="name" autofocus>
       </div>
       <div class="field">
         <label for="email">{{.T "field.email"}}</label>
