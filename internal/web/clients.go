@@ -90,14 +90,8 @@ func validEmails(list string) bool {
 	return true
 }
 
-func (s *Server) clientSave(c *Ctx) error {
-	cl := &store.Client{CompanyID: c.Company.ID}
-	if id := c.id("id"); id != 0 {
-		var err error
-		if cl, err = s.Store.Client(c.Company.ID, id); err != nil {
-			return err
-		}
-	}
+// readClientForm fills cl from the posted client fields.
+func readClientForm(c *Ctx, cl *store.Client) {
 	cl.Name = clip(c.form("name"), 200)
 	cl.ContactName = clip(c.form("contact_name"), 200)
 	cl.Email = clip(c.form("email"), 200)
@@ -110,21 +104,52 @@ func (s *Server) clientSave(c *Ctx) error {
 		cl.Currency = ""
 	}
 	cl.Notes = clip(c.form("notes"), 2000)
+}
+
+// validateClient returns the message key of the first invalid field, or "".
+func validateClient(cl *store.Client) string {
+	if cl.Name == "" {
+		return "err.name_required"
+	}
+	if !validEmails(cl.Email) || strings.ContainsAny(cl.Email, ",; ") {
+		return "err.email_invalid"
+	}
+	if !validEmails(cl.CCEmails) {
+		return "err.email_invalid"
+	}
+	return ""
+}
+
+// clientQuickCreate creates a client from the invoice and recurring editors
+// without leaving the page.
+func (s *Server) clientQuickCreate(c *Ctx) error {
+	cl := &store.Client{CompanyID: c.Company.ID}
+	readClientForm(c, cl)
+	if key := validateClient(cl); key != "" {
+		return c.json(400, map[string]string{"error": c.t(key)})
+	}
+	if err := s.Store.SaveClient(cl); err != nil {
+		return err
+	}
+	c.audit("client.created", cl.Name)
+	return c.json(200, map[string]any{"id": cl.ID, "name": cl.Name, "lang": cl.Lang, "currency": cl.Currency})
+}
+
+func (s *Server) clientSave(c *Ctx) error {
+	cl := &store.Client{CompanyID: c.Company.ID}
+	if id := c.id("id"); id != 0 {
+		var err error
+		if cl, err = s.Store.Client(c.Company.ID, id); err != nil {
+			return err
+		}
+	}
+	readClientForm(c, cl)
 	cl.Archived = c.form("archived") == "1"
 	next := safeNext(c.form("next"))
-	fail := func(key string) error {
+	if key := validateClient(cl); key != "" {
 		p := s.page(c, c.t("client.new"), "clients", map[string]any{"Client": cl, "Next": next})
 		p.Error = c.t(key)
 		return s.render(c, 400, "client_form", p)
-	}
-	if cl.Name == "" {
-		return fail("err.name_required")
-	}
-	if !validEmails(cl.Email) || strings.ContainsAny(cl.Email, ",; ") {
-		return fail("err.email_invalid")
-	}
-	if !validEmails(cl.CCEmails) {
-		return fail("err.email_invalid")
 	}
 	isNew := cl.ID == 0
 	if err := s.Store.SaveClient(cl); err != nil {

@@ -14,13 +14,7 @@
   <div class="card stack">
     <div class="grid-4">
       <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
-        <div class="row">
-          <select id="client_id" name="client_id" required data-client-select>
-            <option value="">{{.T "invoice.choose_client"}}</option>
-            {{range $d.Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $inv.ClientID}}selected{{end}}>{{.Name}}</option>{{end}}
-          </select>
-          <a class="btn btn-ghost btn-sm nowrap" href="{{.CPath "/clients/new?next=%s" (.CPath "/invoices/new")}}">+ {{.T "client.new_short"}}</a>
-        </div>
+        {{template "clientselect" (dict "P" $ "Clients" $d.Clients "Sel" $inv.ClientID "Next" (.CPath "/invoices/new"))}}
       </div>
       <div class="field"><label for="currency">{{.T "field.currency"}}</label>
         <select id="currency" name="currency" data-currency-select>{{range currencies}}<option {{if eq . $inv.Currency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
@@ -49,5 +43,6 @@
     {{if $d.CanSend}}<button class="btn btn-primary" type="submit" name="action" value="send" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.save_send"}}</button>{{end}}
   </div>
 </form>
+{{template "clientdialog" $}}
 {{end}}
 {{end}}

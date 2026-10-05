@@ -197,7 +197,7 @@ input[type=checkbox], input[type=radio] { width: auto; accent-color: var(--prima
 input[type=color] { width: 3rem; height: 2.3rem; padding: .15rem; cursor: pointer; }
 input[type=file] { padding: .45rem; }
 input[readonly] { background: var(--surface-2); }
-select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+select, input[role=combobox] { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
   background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 1.9rem; }
 .check { display: flex; align-items: center; gap: .5rem; font-weight: 500; color: var(--text); cursor: pointer; }
 .hint { font-size: .8rem; color: var(--muted); line-height: 1.45; }
@@ -439,3 +439,15 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
   body { background: #fff; }
   .card { box-shadow: none; }
 }
+
+/* ---------- client picker & dialog ---------- */
+.row > .ac-wrap { flex: 1; min-width: 0; }
+.ac-item.current { font-weight: 600; }
+.ac-item.ac-create { color: var(--primary); font-weight: 550; }
+.ac-list > .ac-foot:first-child { border-top: 0; margin: 0 0 .25rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+.dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+  padding: 1.25rem; width: min(640px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
+.dialog::backdrop { background: rgba(16, 20, 30, .45); }
+.dialog h2 { margin: 0; font-size: 1.15rem; }
+.dialog .flash { margin: 0; }
+@media (max-width: 640px) { .dialog .grid-2, .dialog .grid-3 { grid-template-columns: minmax(0, 1fr); } }

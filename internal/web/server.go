@@ -148,6 +148,7 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/clients/{id}/delete", s.clientDelete)
 	c("POST /c/{cid}/clients/{id}/copy", s.clientCopy)
 	c("GET /c/{cid}/api/lines", s.lineSuggest)
+	c("POST /c/{cid}/api/clients", s.clientQuickCreate)
 
 	c("GET /c/{cid}/invoices", s.invoiceList)
 	c("GET /c/{cid}/invoices/new", s.invoiceForm)
