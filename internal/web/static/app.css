@@ -463,3 +463,7 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 .stripe-perms summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
 .stripe-perms[open] summary { margin-bottom: .5rem; }
 .stripe-perms .table td, .stripe-perms .table th { padding: .45rem .6rem; font-size: .85rem; }
+
+/* ---------- sent e-mails ---------- */
+.mail-frame { width: 100%; height: 720px; border: 1px solid var(--border); background: #f4f4f7; display: block; }
+.mail-text { white-space: pre-wrap; word-break: break-word; font-size: .85rem; margin: .75rem 0 0; }

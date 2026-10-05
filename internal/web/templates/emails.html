@@ -1,0 +1,34 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head">
+  <div><a class="back" href="{{.CPath "/invoices"}}">← {{.T "nav.invoices"}}</a><h1>{{.T "emails.title"}}</h1><p class="muted">{{.T "emails.intro"}}</p></div>
+</div>
+{{if $d.Emails}}
+<div class="card flush">
+  <div class="table-wrap">
+  <table class="table table-click">
+    <thead><tr><th>{{.T "emails.date"}}</th><th>{{.T "emails.type"}}</th><th>{{.T "emails.subject"}}</th><th>{{.T "emails.to"}}</th><th>{{.T "card.invoice"}}</th><th>{{.T "invoice.status"}}</th></tr></thead>
+    <tbody>
+    {{range $d.Emails}}
+    <tr>
+      <td class="nowrap muted">{{$.DateTime .CreatedAt}}</td>
+      <td class="nowrap">{{$.TS "email." .Kind}}</td>
+      <td><a class="row-link" href="{{$.CPath "/emails/%d" .ID}}">{{.Subject}}</a></td>
+      <td class="muted small">{{.To}}</td>
+      <td class="mono nowrap">{{.InvoiceNumber}}</td>
+      <td>{{if eq .Status "failed"}}<span class="badge badge-overdue">{{$.T "emails.failed"}}</span>{{else}}<span class="badge badge-paid">{{$.T "emails.sent"}}</span>{{end}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</div>
+<div class="pager">
+  {{if gt $d.Page 1}}<a class="btn btn-sm" href="?page={{add $d.Page -1}}">← {{.T "action.previous"}}</a>{{end}}
+  <span class="muted small">{{.T "emails.count" $d.Total}}</span>
+  {{if $d.HasNext}}<a class="btn btn-sm" href="?page={{add $d.Page 1}}">{{.T "action.next"}} →</a>{{end}}
+</div>
+{{else}}
+<div class="empty big">{{template "icon" "send"}}<h2>{{.T "emails.empty"}}</h2></div>
+{{end}}
+{{end}}

@@ -300,6 +300,8 @@ func (s *Store) PurgeExpired() {
 	s.DB.Exec(`DELETE FROM invites WHERE expires_at < ?`, t-86400*30)
 	s.DB.Exec(`DELETE FROM password_resets WHERE expires_at < ?`, t-86400)
 	s.DB.Exec(`DELETE FROM audit_log WHERE created_at < ?`, t-86400*730)
+	// e-mails stay listed, their bodies are kept two years
+	s.DB.Exec(`UPDATE email_log SET html = '', text_body = '' WHERE created_at < ? AND (html != '' OR text_body != '')`, t-86400*730)
 }
 
 // ---------- invites & password resets ----------

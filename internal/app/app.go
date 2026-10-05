@@ -232,7 +232,8 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: to, BCC: splitEmails(co.EmailBCC),
 		ReplyTo: co.EmailReplyTo, Subject: subject, HTML: html, Text: text, IdempotencyKey: idemKey,
 		Attachments: []mailer.Attachment{{Filename: FileName(inv), Content: doc}}})
-	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: kind, To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id}
+	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: kind, To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text,
+		Attachments: FileName(inv)}
 	if err != nil {
 		log.Status, log.Error = "failed", err.Error()
 		a.Store.LogEmail(log)
@@ -260,7 +261,7 @@ func (a *App) SendReceipt(ctx context.Context, co *store.Company, inv *store.Inv
 		Link: a.PublicURL(inv)})
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: cl.Recipients(), BCC: splitEmails(co.EmailBCC),
 		ReplyTo: co.EmailReplyTo, Subject: subject, HTML: html, Text: text, IdempotencyKey: "receipt-" + inv.PublicToken})
-	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: "receipt", To: strings.Join(cl.Recipients(), ", "), Subject: subject, Status: "sent", ProviderID: id}
+	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: "receipt", To: strings.Join(cl.Recipients(), ", "), Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text}
 	if err != nil {
 		log.Status, log.Error = "failed", err.Error()
 	}
@@ -274,7 +275,7 @@ func (a *App) SendTestEmail(ctx context.Context, co *store.Company, to, lang str
 	subject, html, text := mailer.Render(mailer.Content{Lang: lang, Kind: "test", CompanyName: co.DisplayName(), Accent: co.AccentColor})
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: []string{to}, ReplyTo: co.EmailReplyTo,
 		Subject: subject, HTML: html, Text: text})
-	log := store.EmailLog{CompanyID: co.ID, Kind: "test", To: to, Subject: subject, Status: "sent", ProviderID: id}
+	log := store.EmailLog{CompanyID: co.ID, Kind: "test", To: to, Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text}
 	if err != nil {
 		log.Status, log.Error = "failed", err.Error()
 	}

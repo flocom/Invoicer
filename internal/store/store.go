@@ -154,29 +154,38 @@ func (s *Store) AuditEntries(limit int) ([]AuditEntry, error) {
 // ---------- email log ----------
 
 type EmailLog struct {
-	ID         int64
-	CompanyID  int64
-	InvoiceID  int64
-	Kind       string
-	To         string
-	Subject    string
-	Status     string
-	ProviderID string
-	Error      string
-	CreatedAt  int64
+	ID          int64
+	CompanyID   int64
+	InvoiceID   int64
+	Kind        string
+	To          string
+	Subject     string
+	Status      string
+	ProviderID  string
+	Error       string
+	HTML        string // body as sent (empty for e-mails logged before it was kept)
+	Text        string
+	Attachments string // file names, comma separated
+	CreatedAt   int64
+	// read back
+	InvoiceNumber string
+	Kept          bool // the body is available (lists do not load it)
 }
 
 func (s *Store) LogEmail(e EmailLog) {
-	_, err := s.DB.Exec(`INSERT INTO email_log(company_id, invoice_id, kind, to_addr, subject, status, provider_id, error, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?)`, e.CompanyID, e.InvoiceID, e.Kind, e.To, e.Subject, e.Status, e.ProviderID, e.Error, time.Now().Unix())
+	_, err := s.DB.Exec(`INSERT INTO email_log(company_id, invoice_id, kind, to_addr, subject, status, provider_id, error, html, text_body,
+		attachments, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, e.CompanyID, e.InvoiceID, e.Kind, e.To, e.Subject, e.Status, e.ProviderID,
+		e.Error, e.HTML, e.Text, e.Attachments, time.Now().Unix())
 	if err != nil {
 		slog.Error("email log", "err", err)
 	}
 }
 
-func (s *Store) EmailsForInvoice(invoiceID int64) ([]EmailLog, error) {
-	rows, err := s.DB.Query(`SELECT id, company_id, invoice_id, kind, to_addr, subject, status, provider_id, error, created_at
-		FROM email_log WHERE invoice_id = ? ORDER BY id DESC`, invoiceID)
+const emailListCols = `e.id, e.company_id, e.invoice_id, e.kind, e.to_addr, e.subject, e.status, e.provider_id, e.error, e.attachments,
+	e.created_at, COALESCE(i.number, ''), e.html != '' OR e.text_body != ''`
+
+func (s *Store) emailList(q string, args ...any) ([]EmailLog, error) {
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -184,12 +193,44 @@ func (s *Store) EmailsForInvoice(invoiceID int64) ([]EmailLog, error) {
 	var out []EmailLog
 	for rows.Next() {
 		var e EmailLog
-		if err := rows.Scan(&e.ID, &e.CompanyID, &e.InvoiceID, &e.Kind, &e.To, &e.Subject, &e.Status, &e.ProviderID, &e.Error, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.CompanyID, &e.InvoiceID, &e.Kind, &e.To, &e.Subject, &e.Status, &e.ProviderID, &e.Error,
+			&e.Attachments, &e.CreatedAt, &e.InvoiceNumber, &e.Kept); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// EmailsForInvoice lists the e-mails of an invoice, newest first (without bodies).
+func (s *Store) EmailsForInvoice(invoiceID int64) ([]EmailLog, error) {
+	return s.emailList(`SELECT `+emailListCols+` FROM email_log e LEFT JOIN invoices i ON i.id = e.invoice_id
+		WHERE e.invoice_id = ? ORDER BY e.id DESC`, invoiceID)
+}
+
+// CompanyEmails lists the e-mails sent by a company, newest first (without bodies).
+func (s *Store) CompanyEmails(companyID int64, limit, offset int) ([]EmailLog, int, error) {
+	var total int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM email_log WHERE company_id = ?`, companyID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	list, err := s.emailList(`SELECT `+emailListCols+` FROM email_log e LEFT JOIN invoices i ON i.id = e.invoice_id
+		WHERE e.company_id = ? ORDER BY e.id DESC LIMIT ? OFFSET ?`, companyID, limit, offset)
+	return list, total, err
+}
+
+// Email loads one e-mail of the company with its body.
+func (s *Store) Email(companyID, id int64) (*EmailLog, error) {
+	e := &EmailLog{}
+	err := s.DB.QueryRow(`SELECT e.id, e.company_id, e.invoice_id, e.kind, e.to_addr, e.subject, e.status, e.provider_id, e.error, e.html,
+		e.text_body, e.attachments, e.created_at, COALESCE(i.number, '') FROM email_log e LEFT JOIN invoices i ON i.id = e.invoice_id
+		WHERE e.id = ? AND e.company_id = ?`, id, companyID).Scan(&e.ID, &e.CompanyID, &e.InvoiceID, &e.Kind, &e.To, &e.Subject, &e.Status,
+		&e.ProviderID, &e.Error, &e.HTML, &e.Text, &e.Attachments, &e.CreatedAt, &e.InvoiceNumber)
+	if err != nil {
+		return nil, notFound(err)
+	}
+	e.Kept = e.HTML != "" || e.Text != ""
+	return e, nil
 }
 
 // ---------- helpers ----------
