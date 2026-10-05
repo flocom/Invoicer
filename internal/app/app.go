@@ -38,6 +38,7 @@ type App struct {
 	loc *time.Location
 
 	checkoutLocks sync.Map // invoice id → *sync.Mutex
+	customerLocks sync.Map // "company:client" → *sync.Mutex
 }
 
 func New(cfg config.Config, st *store.Store, box *security.Box, up *updater.Updater) *App {
@@ -434,12 +435,20 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	a.ExpireSessions(ctx, co, inv.ID, "")
 	lang := i18n.Norm(inv.Lang)
 	cl, _ := a.Store.Client(co.ID, inv.ClientID)
-	email := ""
+	email, customer := "", ""
 	if cl != nil {
 		email = cl.Email
+		if inv.AutoCharge {
+			// save the card for the next invoices of the recurring schedule
+			if sc, err := a.EnsureCustomer(ctx, co, cl); err == nil {
+				customer = sc.CustomerID
+			} else {
+				slog.Warn("stripe customer", "client", cl.ID, "err", err)
+			}
+		}
 	}
 	s, err := stripe.CreateCheckout(ctx, a.StripeKey(co), stripe.CheckoutParams{
-		Amount: inv.Due(), Currency: inv.Currency, Email: email, Locale: lang,
+		Amount: inv.Due(), Currency: inv.Currency, Email: email, Customer: customer, Locale: lang,
 		ProductName: i18n.T(lang, "pdf.invoice") + " " + inv.Number,
 		Description: co.DisplayName(),
 		SuccessURL:  a.PublicURL(inv) + "?paid=1",
@@ -481,6 +490,9 @@ func (a *App) ExpireSessions(ctx context.Context, co *store.Company, invoiceID i
 // ApplyStripeSession records the payment of a completed Checkout Session.
 // It is safe to call several times for the same session.
 func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stripe.Session) error {
+	if s.Mode == "setup" {
+		return a.ApplySetupSession(ctx, co, s)
+	}
 	known, err := a.Store.StripeSession(s.ID)
 	if err != nil {
 		return nil // not one of ours
@@ -518,6 +530,7 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 		return err
 	}
 	a.Store.SetStripeSessionStatus(s.ID, "complete")
+	a.saveCheckoutCard(ctx, co, inv, s)
 	a.ExpireSessions(ctx, co, inv.ID, s.ID)
 	a.Store.Audit(0, co.ID, "", "payment.stripe", fmt.Sprintf("%s %s", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en")))
 	if becamePaid {

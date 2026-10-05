@@ -188,8 +188,11 @@
   <legend>{{$p.T "pay.methods"}}</legend>
   {{if $p.Company.HasStripe}}
   <label class="check"><input type="checkbox" name="card_payment" value="1" {{if .Card}}checked{{end}}> {{$p.T "pay.card"}}</label>
+  {{if .Recurring}}<div class="indent"><label class="check"><input type="checkbox" name="auto_charge" value="1" {{if .AutoCharge}}checked{{end}}> {{$p.T "pay.auto_charge"}}</label>
+    <p class="hint">{{$p.T "pay.auto_charge_hint"}}</p></div>{{end}}
   {{else}}
   <input type="hidden" name="card_payment" value="{{if .Card}}1{{end}}">
+  {{if .Recurring}}<input type="hidden" name="auto_charge" value="{{if .AutoCharge}}1{{end}}">{{end}}
   <div><label class="check muted"><input type="checkbox" disabled> {{$p.T "pay.card"}}</label>
     <p class="hint">{{$p.T "pay.card_unavailable"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments"}}">{{$p.T "action.configure"}}</a>{{end}}</p></div>
   {{end}}

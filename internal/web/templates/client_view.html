@@ -31,6 +31,51 @@
     {{if .Data.Invoices}}{{template "invoice_table" (dict "P" $ "Invoices" .Data.Invoices)}}{{else}}<p class="empty-inline pad">{{.T "client.no_invoices"}}</p>{{end}}
   </div>
 
+  {{with .Data.Pay}}{{if .HasStripe}}
+  <div class="card stack small" id="cards">
+    <h2>{{$.T "card.title"}}</h2>
+    {{if .Cards}}
+    <ul class="card-list">
+      {{range .Cards}}
+      <li>
+        <span>{{template "icon" "card"}} {{.Label}} {{if .Default}}<span class="chip on">{{$.T "card.default"}}</span>{{end}} {{if .Expired $.Today}}<span class="chip">{{$.T "card.expired"}}</span>{{end}}</span>
+        <span class="row">
+          {{if not .Default}}<form method="post" action="{{$.CPath "/clients/%d/cards/%d/default" $cl.ID .ID}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn btn-ghost btn-sm" type="submit">{{$.T "card.make_default"}}</button></form>{{end}}
+          <form method="post" action="{{$.CPath "/clients/%d/cards/%d/delete" $cl.ID .ID}}" data-confirm="{{$.T "card.delete_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn btn-danger-ghost btn-sm" type="submit">{{$.T "action.delete"}}</button></form>
+        </span>
+      </li>
+      {{end}}
+    </ul>
+    <p class="hint">{{$.T "card.default_hint"}}</p>
+    {{if .Chargeable}}
+    <form method="post" action="{{$.CPath "/clients/%d/charge" $cl.ID}}" class="stack small" data-confirm="{{$.T "card.charge_confirm"}}">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <h3>{{$.T "card.charge_title"}}</h3>
+      <div class="grid-2">
+        <div class="field"><label for="charge_invoice">{{$.T "card.invoice"}}</label>
+          <select id="charge_invoice" name="invoice" required>{{range .Chargeable}}<option value="{{.ID}}">{{.Number}} · {{$.Money .Due .Currency}}</option>{{end}}</select></div>
+        <div class="field"><label for="charge_card">{{$.T "card.card"}}</label>
+          <select id="charge_card" name="card" required>{{range .Cards}}<option value="{{.ID}}">{{.Label}}</option>{{end}}</select></div>
+      </div>
+      <div><button class="btn btn-primary" type="submit">{{template "icon" "card"}}{{$.T "card.charge"}}</button></div>
+    </form>
+    {{else}}<p class="muted small">{{$.T "card.nothing_to_charge"}}</p>{{end}}
+    {{else}}
+    <p class="muted">{{$.T "card.none"}}</p>
+    {{end}}
+    <div class="stack small">
+      <h3>{{$.T "card.link_title"}}</h3>
+      <p class="hint">{{$.T "card.link_hint"}}</p>
+      {{if .CardLink}}<div class="row"><input readonly value="{{.CardLink}}" aria-label="{{$.T "card.link_title"}}"><button class="btn btn-sm" type="button" data-copy="{{.CardLink}}" aria-label="{{$.T "action.copy"}}">{{template "icon" "copy"}}</button></div>{{end}}
+      <form method="post" action="{{$.CPath "/clients/%d/card-link" $cl.ID}}" class="row wrap">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        {{if not .CardLink}}<button class="btn btn-sm" type="submit">{{$.T "card.link_create"}}</button>{{end}}
+        {{if and $.Data.CanSend $cl.Email}}<button class="btn btn-sm" type="submit" name="send" value="1">{{template "icon" "send"}}{{$.T "card.link_send"}}</button>{{end}}
+      </form>
+    </div>
+  </div>
+  {{end}}{{end}}
+
   {{if .Data.Others}}
   <div class="card flush">
     <div class="card-head pad"><h2>{{.T "client.other_companies_invoices"}}</h2></div>

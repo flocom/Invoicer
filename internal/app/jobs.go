@@ -108,7 +108,7 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 	copy(lines, r.Lines)
 	inv := &store.Invoice{CompanyID: co.ID, ClientID: cl.ID, Currency: r.Currency, Lang: cl.Lang, IssueDate: issue,
 		DueDate: due.AddDate(0, 0, r.DueDays).Format("2006-01-02"), Notes: r.Notes, PublicToken: security.Token(24),
-		RemindersEnabled: true, CardPayment: r.CardPayment, Lines: lines}
+		RemindersEnabled: true, CardPayment: r.CardPayment, AutoCharge: r.AutoCharge, Lines: lines}
 	remaining := r.Remaining
 	if remaining > 0 {
 		remaining--
@@ -126,6 +126,11 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 		return err
 	}
 	a.Store.Audit(0, co.ID, "", "recurring.generate", fmt.Sprintf("%s → %s", r.Name, issued.Number))
+	// charge the saved card (not for a catch-up backlog older than a week);
+	// the receipt or the payment failure e-mail then replaces the invoice e-mail
+	if r.AutoCharge && co.HasStripe() && issue >= addDays(today, -7) && a.autoCharge(ctx, co, r, issued) {
+		return nil
+	}
 	if r.AutoSend {
 		// only e-mail invoices generated for today, not catch-up backlog older than a week
 		if issue >= addDays(today, -7) {
@@ -226,6 +231,7 @@ func (a *App) RunReminders(ctx context.Context) {
 // ReconcileStripe polls recent Checkout Sessions so payments are detected
 // even without webhooks (local installs, or a missed delivery).
 func (a *App) ReconcileStripe(ctx context.Context) {
+	defer a.ReconcileCards(ctx)
 	sessions, err := a.Store.PendingStripeSessions()
 	if err != nil {
 		return

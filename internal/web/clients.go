@@ -65,7 +65,7 @@ func (s *Server) clientView(c *Ctx) error {
 		}
 	}
 	return s.render(c, 200, "client_view", s.page(c, cl.Name, "clients", map[string]any{"Client": cl, "Invoices": invs,
-		"Related": related, "Others": others, "CopyTargets": targets}))
+		"Related": related, "Others": others, "CopyTargets": targets, "Pay": s.clientCards(c, cl), "CanSend": c.Company.HasResend()}))
 }
 
 func (s *Server) clientForm(c *Ctx) error {
