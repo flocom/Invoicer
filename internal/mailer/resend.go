@@ -16,6 +16,9 @@ import (
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
+// APIBase is the Resend API root (tests point it to a fake server).
+var APIBase = "https://api.resend.com"
+
 type Attachment struct {
 	Filename string
 	Content  []byte
@@ -67,7 +70,7 @@ func Send(ctx context.Context, apiKey string, m Message) (string, error) {
 		body["attachments"] = atts
 	}
 	payload, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, APIBase+"/emails", bytes.NewReader(payload))
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +104,7 @@ func Send(ctx context.Context, apiKey string, m Message) (string, error) {
 // CheckKey validates an API key by listing domains (works with full-access
 // keys; a sending-only key returns 401 "restricted_api_key" which we accept).
 func CheckKey(ctx context.Context, apiKey string) error {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.resend.com/domains", nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, APIBase+"/domains", nil)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("User-Agent", "Invoicer")
 	resp, err := client.Do(req)

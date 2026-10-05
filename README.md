@@ -64,7 +64,8 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 <td width="50%" valign="top">
 
 **Getting paid**
-- Public invoice page with **Pay by card** (Stripe Checkout)
+- Public invoice page with **Pay by card** (Stripe Checkout); the PDF QR code opens it
+- **Saved cards**: recurring invoices can charge the client's card automatically; a failed payment e-mails the client a link to update their card; charge any unpaid invoice from the client page with the card of your choice
 - Stripe webhook set up automatically — no copy-pasting secrets
 - Several bank accounts per company (one per currency or more); each invoice shows the account in its currency, or the one you pick, or none
 - Bank transfer details + **SEPA QR code** on EUR invoices, optionally included in e-mails
@@ -146,7 +147,7 @@ Per-company settings (Resend, Stripe, bank details, numbering, reminders…) are
 1. **Settings → General**: legal name, address, VAT and registration numbers, logo, brand colour.
 2. **Settings → Invoicing**: currency, document language, VAT rate, numbering prefix (`INV-2026-0001`, sequential per year), payment terms, legal footer, bank details, reminder schedule (e.g. `-3,0,7,15,30` days relative to the due date).
 3. **Settings → E-mail**: a [Resend](https://resend.com) API key and a sender on a verified domain. Send a test.
-4. **Settings → Payments**: a Stripe secret key, or better a *restricted* key with write access to *Checkout Sessions* and *Webhook Endpoints*. The webhook is created for you.
+4. **Settings → Payments**: a Stripe secret key, or better a *restricted* key with write access to *Checkout Sessions* and *Webhook Endpoints* (add *Customers*, *Payment Intents*, *Payment Methods* and read access to *Setup Intents* to use saved cards). The webhook is created for you.
 5. **Settings → Access**: choose which members can see the company.
 
 Issued invoices are immutable (numbering without gaps, buyer/seller details frozen at issue time); void and duplicate an invoice to correct it. Administrators can still delete an issued invoice after a legal warning (deleting invoices is prohibited in most countries; the deletion is recorded in the audit log).

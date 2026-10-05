@@ -26,6 +26,7 @@ type Recurring struct {
 	LastError     string
 	BankAccountID int64
 	CardPayment   bool
+	AutoCharge    bool // charge the client's saved card on each generated invoice
 	CreatedAt     int64
 
 	Lines      []Line
@@ -69,12 +70,12 @@ func (r *Recurring) Advance(from string) string {
 }
 
 const recurringCols = `r.id, r.company_id, r.client_id, r.name, r.currency, r.interval_unit, r.interval_count, r.anchor_day, r.next_run,
-	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment`
+	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment, r.auto_charge`
 
 func scanRecurring(row interface{ Scan(...any) error }) (*Recurring, error) {
 	r := &Recurring{}
 	err := row.Scan(&r.ID, &r.CompanyID, &r.ClientID, &r.Name, &r.Currency, &r.IntervalUnit, &r.IntervalCount, &r.AnchorDay,
-		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment)
+		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment, &r.AutoCharge)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -162,18 +163,18 @@ func (s *Store) SaveRecurring(r *Recurring) error {
 	return withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
 		if r.ID == 0 {
 			res, err := tx.Exec(`INSERT INTO recurring(company_id, client_id, name, currency, interval_unit, interval_count, anchor_day,
-				next_run, end_date, remaining, due_days, auto_send, active, notes, bank_account_id, card_payment, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				next_run, end_date, remaining, due_days, auto_send, active, notes, bank_account_id, card_payment, auto_charge, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				r.CompanyID, r.ClientID, r.Name, r.Currency, r.IntervalUnit, r.IntervalCount, r.AnchorDay, r.NextRun, r.EndDate,
-				r.Remaining, r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), now())
+				r.Remaining, r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), now())
 			if err != nil {
 				return err
 			}
 			r.ID, _ = res.LastInsertId()
 		} else {
 			_, err := tx.Exec(`UPDATE recurring SET client_id=?, name=?, currency=?, interval_unit=?, interval_count=?, anchor_day=?,
-				next_run=?, end_date=?, remaining=?, due_days=?, auto_send=?, active=?, notes=?, bank_account_id=?, card_payment=? WHERE id=? AND company_id=?`,
+				next_run=?, end_date=?, remaining=?, due_days=?, auto_send=?, active=?, notes=?, bank_account_id=?, card_payment=?, auto_charge=? WHERE id=? AND company_id=?`,
 				r.ClientID, r.Name, r.Currency, r.IntervalUnit, r.IntervalCount, r.AnchorDay, r.NextRun, r.EndDate, r.Remaining,
-				r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), r.ID, r.CompanyID)
+				r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), r.ID, r.CompanyID)
 			if err != nil {
 				return err
 			}
@@ -233,9 +234,9 @@ func (s *Store) GenerateFromRecurring(r *Recurring, inv *Invoice, next string, r
 		}
 		t := now()
 		ins, err := tx.Exec(`INSERT INTO invoices(company_id, client_id, status, currency, lang, issue_date, due_date, subtotal,
-			tax_total, total, notes, public_token, recurring_id, reminders_enabled, bank_account_id, card_payment, created_at, updated_at)
-			VALUES(?,?,'draft',?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`, inv.CompanyID, inv.ClientID, inv.Currency, inv.Lang, inv.IssueDate,
-			inv.DueDate, inv.Subtotal, inv.TaxTotal, inv.Total, inv.Notes, inv.PublicToken, r.ID, r.BankAccountID, b2i(r.CardPayment), t, t)
+			tax_total, total, notes, public_token, recurring_id, reminders_enabled, bank_account_id, card_payment, auto_charge, created_at, updated_at)
+			VALUES(?,?,'draft',?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`, inv.CompanyID, inv.ClientID, inv.Currency, inv.Lang, inv.IssueDate,
+			inv.DueDate, inv.Subtotal, inv.TaxTotal, inv.Total, inv.Notes, inv.PublicToken, r.ID, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), t, t)
 		if err != nil {
 			return err
 		}

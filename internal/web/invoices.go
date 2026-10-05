@@ -284,11 +284,12 @@ func (s *Server) invoiceView(c *Ctx) error {
 		buyer = store.Party{Name: cl.Name, ContactName: cl.ContactName, Address: cl.Address, Email: cl.Email, TaxID: cl.TaxID}
 	}
 	banks, _ := s.Store.BankAccounts(c.Company.ID)
+	charges, _ := s.Store.InvoiceCharges(inv.ID)
 	return s.render(c, 200, "invoice_view", s.page(c, inv.Title(), "invoices", map[string]any{
 		"Banks": banks, "Bank": s.Store.ResolveBank(c.Company.ID, inv.BankAccountID, inv.Currency),
 		"Invoice": inv, "Client": cl, "Buyer": buyer, "Payments": payments, "Emails": emails,
 		"TaxGroups": store.TaxGroups(inv.Lines), "PublicURL": s.App.PublicURL(inv), "CanSend": c.Company.HasResend(),
-		"HasStripe": c.Company.HasStripe() && inv.CardPayment,
+		"HasStripe": c.Company.HasStripe() && inv.CardPayment, "Charges": charges,
 	}))
 }
 

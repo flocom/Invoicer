@@ -1,5 +1,6 @@
 // Package stripe is a minimal client for the parts of the Stripe API Invoicer
-// uses: Checkout Sessions, webhook endpoints and webhook signature checks.
+// uses: Checkout Sessions, customers and saved cards, off-session payments,
+// webhook endpoints and webhook signature checks.
 package stripe
 
 import (
@@ -20,25 +21,40 @@ import (
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
+// APIBase is the Stripe API root (tests point it to a fake server).
+var APIBase = "https://api.stripe.com"
+
 type Error struct {
-	Status  int
-	Message string
+	Status        int
+	Message       string
+	Code          string // e.g. card_declined, authentication_required
+	DeclineCode   string
+	PaymentIntent *PaymentIntent // set when a payment attempt failed
 }
 
 func (e *Error) Error() string { return fmt.Sprintf("stripe: %s (HTTP %d)", e.Message, e.Status) }
 
 func call(ctx context.Context, key, method, path string, form url.Values, out any) error {
+	return callIdem(ctx, key, method, path, form, "", out)
+}
+
+// callIdem sends the request with an Idempotency-Key (when not empty) so a
+// retried request never charges twice.
+func callIdem(ctx context.Context, key, method, path string, form url.Values, idem string, out any) error {
 	var body io.Reader
 	if form != nil {
 		body = strings.NewReader(form.Encode())
 	}
-	req, err := http.NewRequestWithContext(ctx, method, "https://api.stripe.com"+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, APIBase+path, body)
 	if err != nil {
 		return err
 	}
 	req.SetBasicAuth(key, "")
 	req.Header.Set("Stripe-Version", "2024-06-20")
 	req.Header.Set("User-Agent", "Invoicer")
+	if idem != "" {
+		req.Header.Set("Idempotency-Key", idem)
+	}
 	if form != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -51,14 +67,18 @@ func call(ctx context.Context, key, method, path string, form url.Values, out an
 	if resp.StatusCode >= 300 {
 		var e struct {
 			Error struct {
-				Message string `json:"message"`
+				Message       string         `json:"message"`
+				Code          string         `json:"code"`
+				DeclineCode   string         `json:"decline_code"`
+				PaymentIntent *PaymentIntent `json:"payment_intent"`
 			} `json:"error"`
 		}
 		json.Unmarshal(raw, &e)
 		if e.Error.Message == "" {
 			e.Error.Message = resp.Status
 		}
-		return &Error{Status: resp.StatusCode, Message: e.Error.Message}
+		return &Error{Status: resp.StatusCode, Message: e.Error.Message, Code: e.Error.Code, DeclineCode: e.Error.DeclineCode,
+			PaymentIntent: e.Error.PaymentIntent}
 	}
 	if out != nil {
 		return json.Unmarshal(raw, out)
@@ -155,6 +175,7 @@ type CheckoutParams struct {
 	ProductName string
 	Description string
 	Email       string
+	Customer    string // when set, the card is saved on it for later off-session payments
 	SuccessURL  string
 	CancelURL   string
 	Locale      string
@@ -171,6 +192,9 @@ type Session struct {
 	ExpiresAt     int64             `json:"expires_at"`
 	Metadata      map[string]string `json:"metadata"`
 	PaymentIntent string            `json:"payment_intent"`
+	Mode          string            `json:"mode"` // payment, setup
+	Customer      string            `json:"customer"`
+	SetupIntent   string            `json:"setup_intent"`
 }
 
 func CreateCheckout(ctx context.Context, key string, p CheckoutParams) (*Session, error) {
@@ -185,7 +209,10 @@ func CreateCheckout(ctx context.Context, key string, p CheckoutParams) (*Session
 	}
 	f.Set("success_url", p.SuccessURL)
 	f.Set("cancel_url", p.CancelURL)
-	if p.Email != "" {
+	if p.Customer != "" {
+		f.Set("customer", p.Customer)
+		f.Set("payment_intent_data[setup_future_usage]", "off_session")
+	} else if p.Email != "" {
 		f.Set("customer_email", p.Email)
 	}
 	if p.Locale != "" {
@@ -202,6 +229,162 @@ func CreateCheckout(ctx context.Context, key string, p CheckoutParams) (*Session
 		return nil, err
 	}
 	return &s, nil
+}
+
+// SetupParams describes a Checkout Session that only saves a card.
+type SetupParams struct {
+	Customer   string
+	SuccessURL string
+	CancelURL  string
+	Locale     string
+	Metadata   map[string]string
+}
+
+// CreateSetupCheckout opens a Checkout Session in setup mode: the customer
+// enters a card that is saved for later off-session payments, nothing is charged.
+func CreateSetupCheckout(ctx context.Context, key string, p SetupParams) (*Session, error) {
+	f := url.Values{}
+	f.Set("mode", "setup")
+	f.Set("customer", p.Customer)
+	f.Set("payment_method_types[0]", "card")
+	f.Set("success_url", p.SuccessURL)
+	f.Set("cancel_url", p.CancelURL)
+	if p.Locale != "" {
+		f.Set("locale", p.Locale)
+	}
+	f.Set("expires_at", strconv.FormatInt(time.Now().Add(23*time.Hour).Unix(), 10))
+	for k, v := range p.Metadata {
+		f.Set("metadata["+k+"]", v)
+		f.Set("setup_intent_data[metadata]["+k+"]", v)
+	}
+	var s Session
+	if err := call(ctx, key, http.MethodPost, "/v1/checkout/sessions", f, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// CreateCustomer creates a Stripe customer and returns its id.
+func CreateCustomer(ctx context.Context, key, name, email string, metadata map[string]string) (string, error) {
+	f := url.Values{}
+	f.Set("name", name)
+	if email != "" {
+		f.Set("email", email)
+	}
+	for k, v := range metadata {
+		f.Set("metadata["+k+"]", v)
+	}
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := call(ctx, key, http.MethodPost, "/v1/customers", f, &out); err != nil {
+		return "", err
+	}
+	return out.ID, nil
+}
+
+// Card is a saved card payment method.
+type Card struct {
+	ID       string `json:"id"`
+	Customer string `json:"customer"`
+	Card     struct {
+		Brand    string `json:"brand"`
+		Last4    string `json:"last4"`
+		ExpMonth int    `json:"exp_month"`
+		ExpYear  int    `json:"exp_year"`
+	} `json:"card"`
+}
+
+// PaymentIntent is the subset of a payment we need.
+type PaymentIntent struct {
+	ID             string            `json:"id"`
+	Status         string            `json:"status"` // succeeded, processing, requires_payment_method, requires_action, canceled…
+	Amount         int64             `json:"amount"`
+	AmountReceived int64             `json:"amount_received"`
+	Currency       string            `json:"currency"`
+	Customer       string            `json:"customer"`
+	Metadata       map[string]string `json:"metadata"`
+	LastError      *struct {
+		Message string `json:"message"`
+		Code    string `json:"code"`
+	} `json:"last_payment_error"`
+	PaymentMethod json.RawMessage `json:"payment_method"` // id, or the object when expanded
+}
+
+// Card returns the expanded payment method of the payment, if any.
+func (pi *PaymentIntent) Card() *Card { return expandedCard(pi.PaymentMethod) }
+
+func expandedCard(raw json.RawMessage) *Card {
+	var c Card
+	if len(raw) == 0 || raw[0] != '{' || json.Unmarshal(raw, &c) != nil || c.ID == "" {
+		return nil
+	}
+	return &c
+}
+
+// ChargeParams describes an off-session payment with a saved card.
+type ChargeParams struct {
+	Amount         int64
+	Currency       string
+	Customer       string
+	PaymentMethod  string
+	Description    string
+	Metadata       map[string]string
+	IdempotencyKey string
+}
+
+// Charge confirms an off-session payment with a saved card. A declined card
+// returns an *Error whose PaymentIntent and Code describe the failure.
+func Charge(ctx context.Context, key string, p ChargeParams) (*PaymentIntent, error) {
+	f := url.Values{}
+	f.Set("amount", strconv.FormatInt(p.Amount, 10))
+	f.Set("currency", strings.ToLower(p.Currency))
+	f.Set("customer", p.Customer)
+	f.Set("payment_method", p.PaymentMethod)
+	f.Set("payment_method_types[0]", "card")
+	f.Set("off_session", "true")
+	f.Set("confirm", "true")
+	if p.Description != "" {
+		f.Set("description", p.Description)
+	}
+	for k, v := range p.Metadata {
+		f.Set("metadata["+k+"]", v)
+	}
+	var pi PaymentIntent
+	if err := callIdem(ctx, key, http.MethodPost, "/v1/payment_intents", f, p.IdempotencyKey, &pi); err != nil {
+		return nil, err
+	}
+	return &pi, nil
+}
+
+// GetPaymentIntent fetches a payment with its payment method expanded.
+func GetPaymentIntent(ctx context.Context, key, id string) (*PaymentIntent, error) {
+	var pi PaymentIntent
+	if err := call(ctx, key, http.MethodGet, "/v1/payment_intents/"+url.PathEscape(id)+"?expand[]=payment_method", nil, &pi); err != nil {
+		return nil, err
+	}
+	return &pi, nil
+}
+
+// SetupIntentCard returns the card saved by a setup intent.
+func SetupIntentCard(ctx context.Context, key, id string) (*Card, error) {
+	var si struct {
+		Status        string          `json:"status"`
+		PaymentMethod json.RawMessage `json:"payment_method"`
+	}
+	if err := call(ctx, key, http.MethodGet, "/v1/setup_intents/"+url.PathEscape(id)+"?expand[]=payment_method", nil, &si); err != nil {
+		return nil, err
+	}
+	c := expandedCard(si.PaymentMethod)
+	if si.Status != "succeeded" || c == nil {
+		return nil, errors.New("no card saved")
+	}
+	return c, nil
+}
+
+// DetachCard removes a saved card from its customer.
+func DetachCard(ctx context.Context, key, id string) error {
+	return call(ctx, key, http.MethodPost, "/v1/payment_methods/"+url.PathEscape(id)+"/detach", url.Values{}, nil)
 }
 
 // ExpireCheckout closes an open Checkout Session so it can no longer be paid.

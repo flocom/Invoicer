@@ -13,7 +13,7 @@ import (
 // Content describes a transactional e-mail before rendering.
 type Content struct {
 	Lang        string
-	Kind        string // invoice, reminder_before, reminder_due, reminder_overdue, receipt, test
+	Kind        string // invoice, reminder_before, reminder_due, reminder_overdue, receipt, charge_failed, card_update, test
 	CompanyName string
 	Accent      string
 	ClientName  string
@@ -22,6 +22,8 @@ type Content struct {
 	DueDate     string // formatted
 	DaysLate    int
 	Link        string
+	Link2       string // secondary link (charge_failed: pay the invoice)
+	Card        string // saved card label (charge_failed)
 	Message     string // optional custom message from the sender
 	Bank        [][2]string
 }
@@ -53,6 +55,7 @@ var tpl = template.Must(template.New("mail").Parse(`<!doctype html>
 </table></td></tr>{{end}}
 {{if .Link}}<tr><td style="padding:24px 32px 8px 32px" align="center">
 <a href="{{.Link}}" style="display:inline-block;background:{{.Accent}};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:8px">{{.Button}}</a>
+{{if .Link2}}<p style="margin:16px 0 0 0;font-size:14px"><a href="{{.Link2}}" style="color:{{.Accent}};font-weight:600">{{.Button2}}</a></p>{{end}}
 </td></tr>{{end}}
 <tr><td style="padding:24px 32px 32px 32px;font-size:13px;color:#6b7080;line-height:1.6">{{.Closing}}<br>{{.CompanyName}}</td></tr>
 </table>
@@ -60,8 +63,8 @@ var tpl = template.Must(template.New("mail").Parse(`<!doctype html>
 
 type view struct {
 	Content
-	Subject, Heading, AmountLabel, DueLabel, Button, Closing, BankTitle string
-	Paragraphs                                                          []string
+	Subject, Heading, AmountLabel, DueLabel, Button, Button2, Closing, BankTitle string
+	Paragraphs                                                                   []string
 }
 
 // Render returns subject, HTML and plain-text bodies.
@@ -103,6 +106,17 @@ func Render(c Content) (subject, html, text string) {
 		v.AmountLabel = t("mail.amount_paid")
 		v.DueDate = ""
 		v.Button = t("mail.view_invoice")
+	case "charge_failed":
+		v.Subject = t("mail.charge_failed.subject", c.Number)
+		v.Heading = t("mail.charge_failed.heading")
+		v.Paragraphs = []string{greet, t("mail.charge_failed.body", c.Number, c.Card), t("mail.charge_failed.body2")}
+		v.Button = t("mail.update_card")
+		v.Button2 = t("mail.pay_other_card")
+	case "card_update":
+		v.Subject = t("mail.card_update.subject", c.CompanyName)
+		v.Heading = t("mail.card_update.heading")
+		v.Paragraphs = []string{greet, t("mail.card_update.body", c.CompanyName)}
+		v.Button = t("mail.update_card")
 	default: // test
 		v.Subject = t("mail.test.subject", c.CompanyName)
 		v.Heading = t("mail.test.heading")
@@ -138,6 +152,9 @@ func Render(c Content) (subject, html, text string) {
 	}
 	if c.Link != "" {
 		tb.WriteString(v.Button + ": " + c.Link + "\n\n")
+	}
+	if c.Link2 != "" {
+		tb.WriteString(v.Button2 + ": " + c.Link2 + "\n\n")
 	}
 	tb.WriteString(v.Closing + "\n" + c.CompanyName + "\n")
 	return v.Subject, buf.String(), tb.String()

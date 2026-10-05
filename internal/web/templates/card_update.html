@@ -1,0 +1,18 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="public">
+  <header class="public-head">
+    {{if $d.HasLogo}}<img class="public-logo" src="/logo/{{$d.Co.PublicID}}" alt="{{$d.SellerName}}">{{else}}<strong class="public-name">{{$d.SellerName}}</strong>{{end}}
+  </header>
+  {{if $d.Saved}}<div class="flash flash-ok">{{.T "card.public_saved"}}</div>{{end}}
+  <div class="card public-card stack">
+    <h1>{{.T "card.page_title"}}</h1>
+    <p>{{.T "card.public_intro" $d.SellerName}}</p>
+    {{if $d.Card}}<p>{{.T "card.public_current"}} <strong>{{$d.Card.Label}}</strong></p>{{end}}
+    {{if $d.CanSetup}}
+    <div><a class="btn btn-primary btn-lg" href="/card/{{$d.Token}}/setup">{{template "icon" "card"}}{{if $d.Card}}{{.T "card.public_replace"}}{{else}}{{.T "card.public_add"}}{{end}}</a></div>
+    <p class="hint">{{.T "card.public_secure"}}</p>
+    {{else}}<p class="muted">{{.T "card.public_unavailable"}}</p>{{end}}
+  </div>
+</div>
+{{end}}

@@ -292,4 +292,54 @@ ALTER TABLE recurring ADD COLUMN card_payment INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE clients ADD COLUMN shared INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX clients_shared ON clients(shared) WHERE shared = 1;
 `,
+	// 6 — saved cards charged off-session (per company: each has its own Stripe account)
+	`
+CREATE TABLE stripe_customers (
+	company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+	client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+	customer_id TEXT NOT NULL,
+	card_token  TEXT NOT NULL UNIQUE,
+	created_at  INTEGER NOT NULL,
+	PRIMARY KEY (company_id, client_id)
+);
+CREATE TABLE client_cards (
+	id             INTEGER PRIMARY KEY,
+	company_id     INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+	client_id      INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+	payment_method TEXT NOT NULL,
+	brand          TEXT NOT NULL DEFAULT '',
+	last4          TEXT NOT NULL DEFAULT '',
+	exp_month      INTEGER NOT NULL DEFAULT 0,
+	exp_year       INTEGER NOT NULL DEFAULT 0,
+	is_default     INTEGER NOT NULL DEFAULT 0,
+	created_at     INTEGER NOT NULL,
+	UNIQUE (company_id, payment_method)
+);
+CREATE INDEX client_cards_client ON client_cards(company_id, client_id);
+CREATE TABLE card_setups (
+	id         TEXT PRIMARY KEY,
+	company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+	client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+	status     TEXT NOT NULL DEFAULT 'open',
+	created_at INTEGER NOT NULL,
+	expires_at INTEGER NOT NULL
+);
+CREATE TABLE card_charges (
+	id             INTEGER PRIMARY KEY,
+	company_id     INTEGER NOT NULL,
+	invoice_id     INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+	card_id        INTEGER NOT NULL,
+	card_label     TEXT NOT NULL DEFAULT '',
+	payment_intent TEXT NOT NULL DEFAULT '',
+	amount         INTEGER NOT NULL,
+	status         TEXT NOT NULL DEFAULT 'pending',
+	error          TEXT NOT NULL DEFAULT '',
+	automatic      INTEGER NOT NULL DEFAULT 0,
+	created_by     INTEGER NOT NULL DEFAULT 0,
+	created_at     INTEGER NOT NULL
+);
+CREATE INDEX card_charges_invoice ON card_charges(invoice_id);
+ALTER TABLE recurring ADD COLUMN auto_charge INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN auto_charge INTEGER NOT NULL DEFAULT 0;
+`,
 }

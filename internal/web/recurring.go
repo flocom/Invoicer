@@ -115,6 +115,7 @@ func (s *Server) recurringSave(c *Ctx) error {
 	r.Notes = clip(c.form("notes"), 4000)
 	r.BankAccountID = s.bankChoice(c)
 	r.CardPayment = c.form("card_payment") == "1"
+	r.AutoCharge = r.CardPayment && c.form("auto_charge") == "1"
 	if v := c.form("remaining"); v == "" {
 		r.Remaining = -1
 	} else if n, err := strconv.Atoi(v); err == nil && n >= 0 {

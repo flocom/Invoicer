@@ -100,6 +100,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /i/{token}", s.h(s.publicInvoice))
 	m.HandleFunc("GET /i/{token}/pdf", s.h(s.publicPDF))
 	m.HandleFunc("GET /pay/{token}", s.h(s.publicPay))
+	m.HandleFunc("GET /card/{token}", s.h(s.publicCard))
+	m.HandleFunc("GET /card/{token}/setup", s.h(s.publicCardSetup))
 	m.HandleFunc("POST /webhooks/stripe/{pid}", s.stripeWebhook)
 	m.HandleFunc("GET /logo/{pid}", s.h(s.companyLogo))
 
@@ -147,6 +149,10 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/clients/{id}/edit", s.clientSave)
 	c("POST /c/{cid}/clients/{id}/delete", s.clientDelete)
 	c("POST /c/{cid}/clients/{id}/copy", s.clientCopy)
+	c("POST /c/{cid}/clients/{id}/charge", s.clientCharge)
+	c("POST /c/{cid}/clients/{id}/card-link", s.clientCardLink)
+	c("POST /c/{cid}/clients/{id}/cards/{card}/default", s.clientCardDefault)
+	c("POST /c/{cid}/clients/{id}/cards/{card}/delete", s.clientCardDelete)
 	c("GET /c/{cid}/api/lines", s.lineSuggest)
 	c("POST /c/{cid}/api/clients", s.clientQuickCreate)
 
@@ -250,7 +256,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 
 // redactPath hides bearer tokens (public invoice links, invites) from logs.
 func redactPath(p string) string {
-	for _, pre := range []string{"/i/", "/pay/", "/invite/", "/reset/"} {
+	for _, pre := range []string{"/i/", "/pay/", "/card/", "/invite/", "/reset/"} {
 		if strings.HasPrefix(p, pre) {
 			rest := p[len(pre):]
 			tail := ""

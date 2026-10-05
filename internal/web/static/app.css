@@ -451,3 +451,10 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 .dialog h2 { margin: 0; font-size: 1.15rem; }
 .dialog .flash { margin: 0; }
 @media (max-width: 640px) { .dialog .grid-2, .dialog .grid-3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- saved cards ---------- */
+.indent { padding-left: 1.6rem; }
+.card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.card-list li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: .5rem .65rem; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.card-list li > span:first-child { display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
