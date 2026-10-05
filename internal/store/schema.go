@@ -342,4 +342,11 @@ CREATE INDEX card_charges_invoice ON card_charges(invoice_id);
 ALTER TABLE recurring ADD COLUMN auto_charge INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE invoices ADD COLUMN auto_charge INTEGER NOT NULL DEFAULT 0;
 `,
+	// 7 — content of sent e-mails, to show them again
+	`
+ALTER TABLE email_log ADD COLUMN html TEXT NOT NULL DEFAULT '';
+ALTER TABLE email_log ADD COLUMN text_body TEXT NOT NULL DEFAULT '';
+ALTER TABLE email_log ADD COLUMN attachments TEXT NOT NULL DEFAULT '';
+CREATE INDEX email_log_company ON email_log(company_id, id);
+`,
 }

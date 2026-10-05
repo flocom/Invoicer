@@ -157,6 +157,9 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/api/clients", s.clientQuickCreate)
 
 	c("GET /c/{cid}/invoices", s.invoiceList)
+	c("GET /c/{cid}/emails", s.emailList)
+	c("GET /c/{cid}/emails/{id}", s.emailView)
+	c("GET /c/{cid}/emails/{id}/html", s.emailHTML)
 	c("GET /c/{cid}/invoices/new", s.invoiceForm)
 	c("POST /c/{cid}/invoices/new", s.invoiceSave)
 	c("GET /c/{cid}/invoices/{id}", s.invoiceView)

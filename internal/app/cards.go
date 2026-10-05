@@ -317,7 +317,8 @@ func (a *App) SendChargeFailedEmail(ctx context.Context, co *store.Company, inv 
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: to, BCC: splitEmails(co.EmailBCC),
 		ReplyTo: co.EmailReplyTo, Subject: subject, HTML: html, Text: text, IdempotencyKey: "charge-failed-" + strconv.FormatInt(ch.ID, 10),
 		Attachments: []mailer.Attachment{{Filename: FileName(inv), Content: doc}}})
-	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: "charge_failed", To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id}
+	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: "charge_failed", To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text,
+		Attachments: FileName(inv)}
 	if err != nil {
 		log.Status, log.Error = "failed", err.Error()
 		a.Store.LogEmail(log)
@@ -347,7 +348,7 @@ func (a *App) SendCardLinkEmail(ctx context.Context, co *store.Company, cl *stor
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: to, BCC: splitEmails(co.EmailBCC),
 		ReplyTo: co.EmailReplyTo, Subject: subject, HTML: html, Text: text,
 		IdempotencyKey: "card-link-" + sc.CardToken[:12] + "-" + strconv.FormatInt(time.Now().Unix()/60, 10)})
-	log := store.EmailLog{CompanyID: co.ID, Kind: "card_update", To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id}
+	log := store.EmailLog{CompanyID: co.ID, Kind: "card_update", To: strings.Join(to, ", "), Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text}
 	if err != nil {
 		log.Status, log.Error = "failed", err.Error()
 	}

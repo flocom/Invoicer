@@ -1,0 +1,31 @@
+{{define "content"}}
+{{$e := .Data.Email}}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{if $e.InvoiceID}}{{.CPath "/invoices/%d" $e.InvoiceID}}{{else}}{{.CPath "/emails"}}{{end}}">← {{.T "action.back"}}</a>
+    <h1>{{$e.Subject}}</h1>
+  </div>
+  <div class="actions"><a class="btn" href="{{.CPath "/emails"}}">{{.T "emails.title"}}</a></div>
+</div>
+<div class="detail-grid">
+  <div class="card stack small">
+    <dl class="kv">
+      <dt>{{.T "emails.date"}}</dt><dd>{{.DateTime $e.CreatedAt}}</dd>
+      <dt>{{.T "emails.type"}}</dt><dd>{{.TS "email." $e.Kind}}</dd>
+      <dt>{{.T "emails.to"}}</dt><dd>{{$e.To}}</dd>
+      <dt>{{.T "invoice.status"}}</dt><dd>{{if eq $e.Status "failed"}}<span class="badge badge-overdue">{{.T "emails.failed"}}</span>{{else}}<span class="badge badge-paid">{{.T "emails.sent"}}</span>{{end}}</dd>
+      {{if $e.Error}}<dt>{{.T "emails.error"}}</dt><dd class="danger">{{$e.Error}}</dd>{{end}}
+      {{if $e.InvoiceID}}<dt>{{.T "card.invoice"}}</dt><dd><a class="mono" href="{{.CPath "/invoices/%d" $e.InvoiceID}}">{{or $e.InvoiceNumber "—"}}</a></dd>{{end}}
+      {{if $e.Attachments}}<dt>{{.T "emails.attachments"}}</dt><dd>{{template "icon" "file"}} {{$e.Attachments}}</dd>{{end}}
+    </dl>
+  </div>
+  <div class="stack">
+    {{if $e.Kept}}
+    {{if $e.HTML}}<iframe class="mail-frame card flush" src="{{.CPath "/emails/%d/html" $e.ID}}" sandbox title="{{$e.Subject}}"></iframe>{{end}}
+    {{if $e.Text}}<details class="card"{{if not $e.HTML}} open{{end}}><summary>{{.T "emails.text_version"}}</summary><pre class="mail-text">{{$e.Text}}</pre></details>{{end}}
+    {{else}}
+    <div class="card"><p class="muted">{{.T "emails.not_kept"}}</p></div>
+    {{end}}
+  </div>
+</div>
+{{end}}
