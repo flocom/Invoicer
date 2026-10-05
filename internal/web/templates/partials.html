@@ -142,3 +142,41 @@
   <p class="hint">{{$p.T "invoice.bank_add_first"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments#banks"}}">{{$p.T "settings.add_bank_account"}}</a>{{end}}</p>
 {{end}}
 {{end}}
+
+{{define "clientselect"}}{{$p := .P}}
+<div class="row">
+  <select id="client_id" name="client_id" required data-client-select data-search-ph="{{$p.T "client.search_ph"}}" data-create="{{$p.T "client.create_named"}}" data-create-empty="{{$p.T "client.new"}}" data-no-match="{{$p.T "client.no_match"}}">
+    <option value="">{{$p.T "invoice.choose_client"}}</option>
+    {{range .Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $.Sel}}selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <a class="btn btn-ghost btn-sm nowrap" href="{{$p.CPath "/clients/new?next=%s" .Next}}" data-client-new>+ {{$p.T "client.new_short"}}</a>
+</div>
+{{end}}
+
+{{/* quick client creation from the invoice and recurring editors (opened by app.js) */}}
+{{define "clientdialog"}}
+<dialog class="dialog" data-client-dialog aria-labelledby="client-dialog-title">
+  <form method="post" action="{{.CPath "/api/clients"}}" class="stack" data-client-create data-error="{{.T "err.internal"}}">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <h2 id="client-dialog-title">{{.T "client.new"}}</h2>
+    <div class="flash flash-err" role="alert" data-client-error hidden></div>
+    <div class="grid-2">
+      <div class="field"><label for="qc_name">{{.T "field.client_name"}}</label><input id="qc_name" name="name" required maxlength="200"></div>
+      <div class="field"><label for="qc_email">{{.T "field.email"}}</label><input id="qc_email" name="email" type="email" maxlength="200"></div>
+    </div>
+    <div class="field"><label for="qc_address">{{.T "field.address"}}</label><textarea id="qc_address" name="address" rows="3" maxlength="1000" data-address autocomplete="off"></textarea></div>
+    <div class="grid-3">
+      <div class="field"><label for="qc_tax_id">{{.T "field.tax_id"}}</label><input id="qc_tax_id" name="tax_id" maxlength="60"></div>
+      <div class="field"><label for="qc_lang">{{.T "field.doc_language"}}</label>
+        <select id="qc_lang" name="lang">{{range langs}}<option value="{{.}}" {{if eq . $.Company.DefaultLang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select></div>
+      <div class="field"><label for="qc_currency">{{.T "field.currency"}}</label>
+        <select id="qc_currency" name="currency"><option value="">{{.T "field.company_default"}}</option>{{range currencies}}<option>{{.}}</option>{{end}}</select></div>
+    </div>
+    <p class="hint">{{.T "client.quick_hint"}}</p>
+    <div class="form-actions align-end">
+      <button class="btn" type="button" data-dialog-close>{{.T "mfa.cancel"}}</button>
+      <button class="btn btn-primary" type="submit">{{.T "action.save"}}</button>
+    </div>
+  </form>
+</dialog>
+{{end}}

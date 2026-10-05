@@ -282,6 +282,172 @@
     });
   });
 
+  // ---- searchable client picker with inline creation ----
+  function fold(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+
+  var clientDialog = document.querySelector("[data-client-dialog]");
+  var dialogPicker = null;
+  function openClientDialog(picker, name) {
+    if (!clientDialog || typeof clientDialog.showModal !== "function") return false;
+    var f = clientDialog.querySelector("form");
+    f.reset();
+    f.querySelector("[data-client-error]").hidden = true;
+    f.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+    f.elements.name.value = name || "";
+    dialogPicker = picker;
+    clientDialog.showModal();
+    f.elements.name.focus();
+    return true;
+  }
+  if (clientDialog) {
+    var cform = clientDialog.querySelector("form");
+    clientDialog.querySelector("[data-dialog-close]").addEventListener("click", function () { clientDialog.close(); });
+    cform.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var err = cform.querySelector("[data-client-error]");
+      var fail = function (msg) {
+        err.textContent = msg || cform.getAttribute("data-error");
+        err.hidden = false;
+        cform.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+      };
+      fetch(cform.action, { method: "POST", body: new FormData(cform), credentials: "same-origin",
+        headers: { Accept: "application/json", "X-CSRF-Token": cform.elements.csrf.value } })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.d.id) { fail(res.d.error); return; }
+          clientDialog.close();
+          if (dialogPicker) dialogPicker.add(res.d);
+        })
+        .catch(function () { fail(); });
+    });
+  }
+
+  var comboSeq = 0;
+  document.querySelectorAll("select[data-client-select]").forEach(function (sel) {
+    var wrap = document.createElement("div");
+    wrap.className = "ac-wrap";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.id = sel.id;
+    sel.id = sel.id + "_select";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+    input.placeholder = sel.getAttribute("data-search-ph") || "";
+    input.required = sel.required;
+    sel.required = false;
+    sel.hidden = true;
+    var list = document.createElement("div");
+    list.className = "ac-list";
+    list.id = "combo-" + (++comboSeq);
+    list.setAttribute("role", "listbox");
+    list.hidden = true;
+    input.setAttribute("aria-controls", list.id);
+    wrap.appendChild(input);
+    wrap.appendChild(list);
+    sel.parentNode.insertBefore(wrap, sel);
+    var chooseMsg = sel.options[0] ? sel.options[0].text : "";
+    var items = [], active = -1;
+
+    function current() { var o = sel.options[sel.selectedIndex]; return o && o.value ? o : null; }
+    function restore() { var o = current(); input.value = o ? o.text : ""; input.setCustomValidity(""); }
+    function close() { list.hidden = true; active = -1; input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant"); }
+    function highlight(i) {
+      var nodes = list.querySelectorAll(".ac-item");
+      nodes.forEach(function (n, j) { n.classList.toggle("active", j === i); });
+      active = i;
+      if (nodes[i]) { input.setAttribute("aria-activedescendant", nodes[i].id); nodes[i].scrollIntoView({ block: "nearest" }); }
+    }
+    function open(q) {
+      var f = fold(q.trim()), sel0 = current();
+      items = [];
+      Array.prototype.forEach.call(sel.options, function (o) {
+        if (o.value && (!f || fold(o.text).indexOf(f) !== -1)) items.push({ opt: o });
+      });
+      if (clientDialog) items.push({ create: q.trim() });
+      list.textContent = "";
+      var start = -1;
+      items.forEach(function (it, i) {
+        var el = document.createElement("div");
+        el.className = "ac-item";
+        el.id = list.id + "-" + i;
+        el.setAttribute("role", "option");
+        if (it.opt) {
+          el.textContent = it.opt.text;
+          if (it.opt === sel0) { el.classList.add("current"); el.setAttribute("aria-selected", "true"); if (!f) start = i; }
+        } else {
+          el.classList.add("ac-create");
+          el.textContent = "+ " + (it.create ? sel.getAttribute("data-create").replace("%s", it.create) : sel.getAttribute("data-create-empty"));
+        }
+        el.addEventListener("mousedown", function (e) { e.preventDefault(); pick(i); });
+        list.appendChild(el);
+      });
+      if (f && !items.some(function (it) { return it.opt; })) {
+        var none = document.createElement("div");
+        none.className = "ac-foot";
+        none.textContent = sel.getAttribute("data-no-match");
+        list.insertBefore(none, list.firstChild);
+      }
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      highlight(start >= 0 ? start : (f ? 0 : -1));
+    }
+    function pick(i) {
+      var it = items[i];
+      close();
+      if (!it) return;
+      if (it.opt) {
+        sel.value = it.opt.value;
+        restore();
+        sel.dispatchEvent(new Event("change"));
+      } else {
+        restore();
+        openClientDialog(api, it.create);
+      }
+    }
+    var api = {
+      add: function (c) {
+        var o = document.createElement("option");
+        o.value = c.id;
+        o.text = c.name;
+        o.setAttribute("data-lang", c.lang || "");
+        o.setAttribute("data-currency", c.currency || "");
+        var before = null;
+        for (var k = 1; k < sel.options.length; k++) {
+          if (sel.options[k].text.localeCompare(c.name, undefined, { sensitivity: "base" }) > 0) { before = sel.options[k]; break; }
+        }
+        sel.insertBefore(o, before);
+        sel.value = o.value;
+        restore();
+        sel.dispatchEvent(new Event("change"));
+        input.focus();
+      },
+    };
+
+    restore();
+    input.addEventListener("focus", function () { input.select(); });
+    input.addEventListener("click", function () { if (list.hidden) open(""); });
+    input.addEventListener("input", function () { input.setCustomValidity(input.value ? chooseMsg : ""); open(input.value); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); if (list.hidden) open(""); else highlight(Math.min(active + 1, items.length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); highlight(Math.max(active - 1, 0)); }
+      else if (e.key === "Enter" && !list.hidden) { e.preventDefault(); if (active >= 0) pick(active); }
+      else if (e.key === "Escape" && !list.hidden) { e.preventDefault(); close(); restore(); }
+    });
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        close();
+        if (!input.value.trim() && current()) { sel.value = ""; sel.dispatchEvent(new Event("change")); }
+        restore();
+      }, 120);
+    });
+
+    // the plain link stays as a fallback without JavaScript
+    var link = sel.closest(".field") && sel.closest(".field").querySelector("[data-client-new]");
+    if (link) link.addEventListener("click", function (e) { if (openClientDialog(api, "")) e.preventDefault(); });
+  });
+
   // issue date moves the due date by the payment terms
   document.querySelectorAll("[data-issue-date]").forEach(function (issue) {
     var due = issue.form.querySelector("[data-due-date]");

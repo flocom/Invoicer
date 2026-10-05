@@ -315,6 +315,10 @@ var ui = [][3]string{
 
 	{"client.new", "New client", "Nouveau client"},
 	{"client.new_short", "Client", "Client"},
+	{"client.search_ph", "Search or create a client…", "Rechercher ou créer un client…"},
+	{"client.create_named", "Create client “%s”", "Créer le client « %s »"},
+	{"client.no_match", "No client found.", "Aucun client trouvé."},
+	{"client.quick_hint", "Other details can be completed later from the client's page.", "Les autres informations peuvent être complétées plus tard depuis la fiche du client."},
 	{"client.edit", "Edit client", "Modifier le client"},
 	{"client.outstanding", "Outstanding", "Encours"},
 	{"client.show_archived", "Show archived", "Afficher les archivés"},

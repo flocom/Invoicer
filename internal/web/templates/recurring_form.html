@@ -13,7 +13,7 @@
   {{end}}
 </div>
 {{if not $d.Clients}}
-<div class="empty big">{{template "icon" "users"}}<h2>{{.T "invoice.need_client"}}</h2><a class="btn btn-primary" href="{{.CPath "/clients/new"}}">{{.T "client.new"}}</a></div>
+<div class="empty big">{{template "icon" "users"}}<h2>{{.T "invoice.need_client"}}</h2><a class="btn btn-primary" href="{{.CPath "/clients/new?next=%s" (.CPath "/recurring/new")}}">{{.T "client.new"}}</a></div>
 {{else}}
 {{if $r.LastError}}<div class="flash flash-err">{{.T "recurring.last_error"}} {{$r.LastError}}</div>{{end}}
 <form method="post" class="invoice-editor stack" data-invoice-form>
@@ -22,10 +22,7 @@
     <div class="grid-4">
       <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}" aria-describedby="name_hint"><p class="hint" id="name_hint">{{.T "recurring.name_hint"}}</p></div>
       <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
-        <select id="client_id" name="client_id" required data-client-select>
-          <option value="">{{.T "invoice.choose_client"}}</option>
-          {{range $d.Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $r.ClientID}}selected{{end}}>{{.Name}}</option>{{end}}
-        </select>
+        {{template "clientselect" (dict "P" $ "Clients" $d.Clients "Sel" $r.ClientID "Next" (.CPath "/recurring/new"))}}
         <p class="hint">{{.T "recurring.lang_hint"}}</p>
       </div>
     </div>
@@ -64,6 +61,7 @@
   </div>
   <div class="form-actions sticky-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
 </form>
+{{template "clientdialog" $}}
 
 {{if not $d.IsNew}}
 <section class="card flush">
