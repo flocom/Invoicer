@@ -134,6 +134,25 @@ func (s *Store) DefaultCard(companyID, clientID int64) (*SavedCard, error) {
 		companyID, clientID))
 }
 
+// DefaultCardLabels maps each client of the company with a default card to
+// that card's label.
+func (s *Store) DefaultCardLabels(companyID int64) (map[int64]string, error) {
+	rows, err := s.DB.Query(`SELECT `+cardCols+` FROM client_cards WHERE company_id = ? AND is_default = 1`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		c, err := scanCard(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[c.ClientID] = c.Label()
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) SetDefaultCard(companyID, clientID, id int64) error {
 	_, err := s.DB.Exec(`UPDATE client_cards SET is_default = (id = ?) WHERE company_id = ? AND client_id = ?
 		AND EXISTS (SELECT 1 FROM client_cards WHERE id = ? AND company_id = ? AND client_id = ?)`, id, companyID, clientID, id, companyID, clientID)

@@ -147,7 +147,7 @@
 <div class="row">
   <select id="client_id" name="client_id" required data-client-select data-search-ph="{{$p.T "client.search_ph"}}" data-create="{{$p.T "client.create_named"}}" data-create-empty="{{$p.T "client.new"}}" data-no-match="{{$p.T "client.no_match"}}">
     <option value="">{{$p.T "invoice.choose_client"}}</option>
-    {{range .Clients}}<option value="{{.ID}}" data-lang="{{.Lang}}" data-currency="{{.Currency}}" {{if eq .ID $.Sel}}selected{{end}}>{{.Name}}</option>{{end}}
+    {{range $cl := .Clients}}<option value="{{$cl.ID}}" data-lang="{{$cl.Lang}}" data-currency="{{$cl.Currency}}"{{with $.Cards}}{{with index . $cl.ID}} data-card="{{.}}"{{end}}{{end}} {{if eq $cl.ID $.Sel}}selected{{end}}>{{$cl.Name}}</option>{{end}}
   </select>
   <a class="btn btn-ghost btn-sm nowrap" href="{{$p.CPath "/clients/new?next=%s" .Next}}" data-client-new>+ {{$p.T "client.new_short"}}</a>
 </div>

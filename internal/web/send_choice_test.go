@@ -97,3 +97,39 @@ func TestAskBeforeEmailing(t *testing.T) {
 		t.Fatalf("generated: %d", len(invs))
 	}
 }
+
+func TestAskWhenSavingScheduleDueToday(t *testing.T) {
+	e := newEnv(t)
+	api := newFakeAPIs(t)
+	b := setupOwner(t, e)
+	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
+	e.app.Store.UpdateCompanyEmail(1, e.app.Box.Seal("re_test_key", "company:1:resend"), false, "billing@alpha.test", "", "")
+	b.post("/c/1/clients/new", url.Values{"name": {"Globex"}, "email": {"ap@globex.test"}, "lang": {"en"}})
+	b.get("/c/1/recurring/new")
+	b.must("data-first-run-dialog")
+	b.must(`name="first_mode"`)
+	save := func(mode string) {
+		b.post("/c/1/recurring/new", url.Values{"name": {"Hosting " + mode}, "client_id": {"1"}, "currency": {"EUR"}, "interval_count": {"1"},
+			"interval_unit": {"month"}, "next_run": {e.app.Today()}, "due_days": {"30"}, "auto_send": {"1"}, "first_mode": {mode},
+			"line_desc": {"Hosting"}, "line_qty": {"1"}, "line_price": {"10"}, "line_tax": {"0"}})
+	}
+	// "do not send" wins over the schedule's automatic sending
+	save("none")
+	if n := len(api.mailSubjects()); n != 0 {
+		t.Fatalf("first_mode=none sent %d e-mail(s)", n)
+	}
+	save("email")
+	if n := len(api.mailSubjects()); n != 1 {
+		t.Fatalf("first_mode=email sent %d e-mail(s)", n)
+	}
+	// without an answer (no JavaScript) the schedule's settings apply
+	save("")
+	if n := len(api.mailSubjects()); n != 2 {
+		t.Fatalf("no answer: %d e-mail(s)", n)
+	}
+	for id := int64(1); id <= 3; id++ {
+		if invs, _ := e.app.Store.RecurringInvoices(1, id); len(invs) != 1 {
+			t.Fatalf("schedule %d generated %d invoice(s)", id, len(invs))
+		}
+	}
+}

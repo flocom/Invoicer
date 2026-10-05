@@ -4,6 +4,7 @@
 
   // ---- confirmations (on forms or on submit buttons) ----
   document.addEventListener("submit", function (e) {
+    if (e.defaultPrevented) return; // stopped by a more specific handler
     var form = e.target;
     var btn = e.submitter;
     var msg = (btn && btn.getAttribute("data-confirm")) || form.getAttribute("data-confirm");
@@ -474,6 +475,43 @@
     // the plain link stays as a fallback without JavaScript
     var link = sel.closest(".field") && sel.closest(".field").querySelector("[data-client-new]");
     if (link) link.addEventListener("click", function (e) { if (openClientDialog(api, "")) e.preventDefault(); });
+  });
+
+  // saving a schedule due today generates an invoice: ask what to do with it
+  document.querySelectorAll("form[data-first-run]").forEach(function (form) {
+    var dlg = document.querySelector("[data-first-run-dialog]");
+    var modeInput = form.querySelector("input[name=first_mode]");
+    if (!dlg || typeof dlg.showModal !== "function" || !modeInput) return;
+    var chargeBtn = dlg.querySelector("[data-mode=charge]");
+    var chargeHint = dlg.querySelector("[data-charge-hint]");
+    function cardLabel() {
+      var sel = form.querySelector("select[data-client-select]");
+      var opt = sel && sel.options[sel.selectedIndex];
+      var card = form.querySelector("input[name=card_payment][type=checkbox]");
+      var auto = form.querySelector("input[name=auto_charge][type=checkbox]");
+      if (!opt || !card || !auto || !card.checked || !auto.checked) return "";
+      return opt.getAttribute("data-card") || "";
+    }
+    form.addEventListener("submit", function (e) {
+      if (modeInput.value) return; // answered
+      var next = form.querySelector("input[name=next_run]");
+      if (form.getAttribute("data-active") !== "1" || !next || !next.value || next.value > form.getAttribute("data-today")) return;
+      var label = cardLabel();
+      chargeBtn.hidden = !label;
+      chargeHint.hidden = !label;
+      chargeBtn.querySelector("[data-card-label]").textContent = label ? "· " + label : "";
+      if (dlg.querySelectorAll("[data-mode]:not([hidden])").length < 2) return; // nothing to choose
+      e.preventDefault();
+      dlg.showModal();
+    });
+    dlg.querySelectorAll("[data-mode]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        modeInput.value = b.getAttribute("data-mode");
+        dlg.close();
+        form.requestSubmit();
+      });
+    });
+    dlg.querySelector("[data-dialog-close]").addEventListener("click", function () { dlg.close(); });
   });
 
   // issue date moves the due date by the payment terms
