@@ -59,6 +59,9 @@ func TestSentEmailsHistory(t *testing.T) {
 	}
 	b.get("/c/1/emails/1/html")
 	b.must("Please find attached your invoice")
+	if strings.Contains(b.last, "/pay/") {
+		t.Fatal("no card payment link without Stripe")
+	}
 
 	// e-mails stay within their company
 	b.get("/c/2/emails/1")

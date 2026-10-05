@@ -167,7 +167,7 @@ func TestSavedCardsAndCharges(t *testing.T) {
 
 	// recurring invoice charged automatically on the default card
 	b.post("/c/1/recurring/new", url.Values{"name": {"Hosting"}, "client_id": {"1"}, "currency": {"EUR"}, "interval_count": {"1"},
-		"interval_unit": {"month"}, "next_run": {e.app.Today()}, "due_days": {"30"}, "card_payment": {"1"}, "auto_charge": {"1"}, "auto_send": {"1"},
+		"interval_unit": {"month"}, "next_run": {tomorrow()}, "due_days": {"30"}, "card_payment": {"1"}, "auto_charge": {"1"}, "auto_send": {"1"},
 		"line_desc": {"Hosting"}, "line_qty": {"1"}, "line_price": {"10"}, "line_tax": {"0"}})
 	recs, _ := e.app.Store.RecurringList(1)
 	if len(recs) != 1 || !recs[0].AutoCharge {
@@ -197,7 +197,7 @@ func TestSavedCardsAndCharges(t *testing.T) {
 	mails := api.mails[before:]
 	api.mu.Unlock()
 	if len(mails) != 1 || !strings.Contains(fmt.Sprint(mails[0]["subject"]), "Card payment failed") ||
-		!strings.Contains(fmt.Sprint(mails[0]["html"]), "/card/"+token) || !strings.Contains(fmt.Sprint(mails[0]["html"]), "/i/"+failed.PublicToken) {
+		!strings.Contains(fmt.Sprint(mails[0]["html"]), "/card/"+token) || !strings.Contains(fmt.Sprint(mails[0]["html"]), "/pay/"+failed.PublicToken) {
 		t.Fatalf("failure e-mail: %v", mails)
 	}
 	if atts, _ := mails[0]["attachments"].([]any); len(atts) != 1 {

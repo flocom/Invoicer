@@ -306,8 +306,8 @@ func (a *App) SendChargeFailedEmail(ctx context.Context, co *store.Company, inv 
 	c := mailer.Content{Lang: lang, Kind: "charge_failed", CompanyName: co.DisplayName(), Accent: co.AccentColor,
 		ClientName: firstNonEmpty(cl.ContactName, cl.Name), Number: inv.Number, Amount: money.Format(inv.Due(), inv.Currency, lang),
 		DueDate: i18n.Date(lang, inv.DueDate), Card: ch.CardLabel, Link: a.CardURL(sc)}
-	if inv.CardPayment {
-		c.Link2 = a.PublicURL(inv)
+	if inv.CardPayable(co) {
+		c.Link2 = a.PayURL(inv)
 	}
 	subject, html, text := mailer.Render(c)
 	doc, err := a.PDF(co, inv)

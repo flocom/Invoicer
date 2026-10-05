@@ -49,6 +49,29 @@ func (s *Server) clientCharge(c *Ctx) error {
 		c.bad("card.choose_card")
 		return c.redirect(back)
 	}
+	s.chargeAndReport(c, inv, card)
+	return c.redirect(back)
+}
+
+// invoiceCharge charges an open invoice on one of its client's saved cards.
+func (s *Server) invoiceCharge(c *Ctx) error {
+	inv, err := s.loadInvoice(c)
+	if err != nil {
+		return err
+	}
+	back := c.cpath("/invoices/%d", inv.ID)
+	cardID, _ := strconv.ParseInt(c.form("card"), 10, 64)
+	card, err := s.Store.Card(c.Company.ID, inv.ClientID, cardID)
+	if err != nil {
+		c.bad("card.choose_card")
+		return c.redirect(back)
+	}
+	s.chargeAndReport(c, inv, card)
+	return c.redirect(back)
+}
+
+// chargeAndReport charges the card now and flashes the outcome.
+func (s *Server) chargeAndReport(c *Ctx, inv *store.Invoice, card *store.SavedCard) {
 	ctx, cancel := context.WithTimeout(c.R.Context(), 40*time.Second)
 	defer cancel()
 	ch, err := s.App.ChargeInvoice(ctx, c.Company, inv, card, false, c.User.ID)
@@ -64,7 +87,6 @@ func (s *Server) clientCharge(c *Ctx) error {
 		slog.Error("card charge", "invoice", inv.ID, "err", err)
 		c.flash("err", c.t("card.charge_failed", inv.Number)+" "+err.Error())
 	}
-	return c.redirect(back)
 }
 
 func (s *Server) clientCardDefault(c *Ctx) error {

@@ -177,6 +177,7 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/invoices/{id}/duplicate", s.invoiceDuplicate)
 	c("POST /c/{cid}/invoices/{id}/reminders", s.invoiceToggleReminders)
 	c("POST /c/{cid}/invoices/{id}/bank", s.invoiceSetBank)
+	c("POST /c/{cid}/invoices/{id}/charge", s.invoiceCharge)
 
 	c("GET /c/{cid}/recurring", s.recurringList)
 	c("GET /c/{cid}/recurring/new", s.recurringForm)

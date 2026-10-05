@@ -79,8 +79,16 @@
       </table>
       {{else}}<p class="empty-inline">{{.T "invoice.no_payments"}}</p>{{end}}
 
+      {{if $d.Cards}}
+      <form method="post" action="{{.CPath "/invoices/%d/charge" $inv.ID}}" class="charge-row row wrap" data-confirm="{{.T "card.charge_invoice_confirm" (.Money $inv.Due $inv.Currency)}}">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <select name="card" aria-label="{{.T "card.card"}}">{{range $d.Cards}}<option value="{{.ID}}">{{.Label}}{{if .Default}} · {{$.T "card.default"}}{{end}}</option>{{end}}</select>
+        <button class="btn btn-primary nowrap" type="submit">{{template "icon" "card"}}{{.T "card.charge_amount" (.Money $inv.Due $inv.Currency)}}</button>
+      </form>
+      {{end}}
+
       {{if eq $inv.Status "open"}}
-      <details class="disclosure" {{if not $d.Payments}}open{{end}}>
+      <details class="disclosure" {{if and (not $d.Payments) (not $d.Cards)}}open{{end}}>
         <summary>{{.T "invoice.record_payment"}}</summary>
         <form method="post" action="{{.CPath "/invoices/%d/payments" $inv.ID}}" class="stack">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
