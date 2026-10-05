@@ -361,4 +361,11 @@ CREATE TABLE hidden_suggestions (
 	PRIMARY KEY (company_id, description)
 );
 `,
+	// 9 — e-mails of deleted invoices were inherited by the next invoice that
+	// got the same id: detach those sent before their invoice existed
+	`
+UPDATE email_log SET invoice_id = 0 WHERE invoice_id != 0 AND NOT EXISTS (
+	SELECT 1 FROM invoices i WHERE i.id = email_log.invoice_id AND i.company_id = email_log.company_id
+	AND i.created_at <= email_log.created_at);
+`,
 }

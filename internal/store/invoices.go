@@ -421,19 +421,35 @@ func (s *Store) DeleteInvoice(companyID, id int64) (*Invoice, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.DB.Exec(`DELETE FROM invoices WHERE id = ? AND company_id = ?`, id, companyID)
-	return inv, err
+	return inv, s.deleteInvoice(companyID, id, false)
 }
 
 func (s *Store) DeleteDraft(companyID, id int64) error {
-	res, err := s.DB.Exec(`DELETE FROM invoices WHERE id = ? AND company_id = ? AND status = 'draft'`, id, companyID)
-	if err != nil {
+	return s.deleteInvoice(companyID, id, true)
+}
+
+// deleteInvoice removes the invoice (lines, payments, sessions and charges
+// cascade). Its e-mails stay in the company's sent e-mails but are detached:
+// SQLite may give the same id to the next invoice, which must not inherit them.
+func (s *Store) deleteInvoice(companyID, id int64, draftOnly bool) error {
+	return withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
+		q := `DELETE FROM invoices WHERE id = ? AND company_id = ?`
+		if draftOnly {
+			q += ` AND status = 'draft'`
+		}
+		res, err := tx.Exec(q, id, companyID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
+			if draftOnly {
+				return errors.New("only drafts can be deleted")
+			}
+			return ErrNotFound
+		}
+		_, err = tx.Exec(`UPDATE email_log SET invoice_id = 0 WHERE invoice_id = ? AND company_id = ?`, id, companyID)
 		return err
-	}
-	if n, _ := res.RowsAffected(); n != 1 {
-		return errors.New("only drafts can be deleted")
-	}
-	return nil
+	})
 }
 
 // ---------- payments ----------
