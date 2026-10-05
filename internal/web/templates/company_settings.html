@@ -149,6 +149,24 @@
     <input id="stripe_key" name="stripe_key" type="password" required autocomplete="new-password" spellcheck="false" class="mono" placeholder="{{if $d.StripeKeySet}}••••••••••••  ({{.T "settings.key_saved"}}){{else}}sk_live_… / rk_live_…{{end}}">
     <p class="hint">{{.T "settings.stripe_key_hint"}}</p>
   </div>
+  <details class="stripe-perms" {{if not $d.StripeKeySet}}open{{end}}>
+    <summary>{{.T "settings.stripe_perms_title"}}</summary>
+    <p class="hint">{{.T "settings.stripe_perms_intro"}}</p>
+    <div class="table-wrap">
+    <table class="table compact">
+      <thead><tr><th>{{.T "settings.stripe_perm_resource"}}</th><th>{{.T "settings.stripe_perm_access"}}</th><th>{{.T "settings.stripe_perm_used_for"}}</th></tr></thead>
+      <tbody>
+        <tr><td class="mono nowrap">Checkout Sessions</td><td><span class="chip on">{{.T "settings.stripe_perm_write"}}</span></td><td>{{.T "settings.stripe_perm_checkout"}}</td></tr>
+        <tr><td class="mono nowrap">Webhook Endpoints</td><td><span class="chip on">{{.T "settings.stripe_perm_write"}}</span></td><td>{{.T "settings.stripe_perm_webhooks"}}</td></tr>
+        <tr><td class="mono nowrap">Customers</td><td><span class="chip on">{{.T "settings.stripe_perm_write"}}</span></td><td>{{.T "settings.stripe_perm_customers"}}</td></tr>
+        <tr><td class="mono nowrap">PaymentIntents</td><td><span class="chip on">{{.T "settings.stripe_perm_write"}}</span></td><td>{{.T "settings.stripe_perm_payment_intents"}}</td></tr>
+        <tr><td class="mono nowrap">PaymentMethods</td><td><span class="chip on">{{.T "settings.stripe_perm_write"}}</span></td><td>{{.T "settings.stripe_perm_payment_methods"}}</td></tr>
+        <tr><td class="mono nowrap">SetupIntents</td><td><span class="chip">{{.T "settings.stripe_perm_read"}}</span></td><td>{{.T "settings.stripe_perm_setup_intents"}}</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="hint">{{.T "settings.stripe_perms_note"}}</p>
+  </details>
   <div class="form-actions"><button class="btn btn-primary" type="submit">{{if $d.StripeKeySet}}{{.T "settings.stripe_replace"}}{{else}}{{.T "settings.stripe_connect"}}{{end}}</button></div>
 </form>
 {{if $d.StripeKeySet}}

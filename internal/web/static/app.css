@@ -458,3 +458,8 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 .card-list li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap;
   padding: .5rem .65rem; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .card-list li > span:first-child { display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+
+/* ---------- Stripe key permissions ---------- */
+.stripe-perms summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
+.stripe-perms[open] summary { margin-bottom: .5rem; }
+.stripe-perms .table td, .stripe-perms .table th { padding: .45rem .6rem; font-size: .85rem; }
