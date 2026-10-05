@@ -469,6 +469,7 @@ var invoicesUI = [][3]string{
 	{"recurring.new", "New recurring invoice", "Nouvelle facture récurrente"},
 	{"recurring.name", "Name", "Nom"},
 	{"recurring.name_ph", "e.g. Monthly hosting", "ex. Hébergement mensuel"},
+	{"recurring.name_hint", "Internal label only — never shown to the client or on invoices.", "Libellé interne uniquement — jamais visible par le client ni sur les factures."},
 	{"recurring.lang_hint", "Invoices use the client's language.", "Les factures utilisent la langue du client."},
 	{"recurring.every", "Every", "Tous les"},
 	{"recurring.frequency", "Frequency", "Fréquence"},
