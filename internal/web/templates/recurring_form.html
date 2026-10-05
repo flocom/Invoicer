@@ -7,7 +7,18 @@
   </div>
   {{if not $d.IsNew}}
   <div class="actions">
-    {{if $r.Active}}<form method="post" action="{{.CPath "/recurring/%d/run" $r.ID}}" data-confirm="{{.T "recurring.run_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "recurring.run_now"}}</button></form>{{end}}
+    {{if and $r.Active $d.Card}}
+    <details class="menu">
+      <summary class="btn">{{.T "recurring.run_now"}} ▾</summary>
+      <div class="menu-panel"><form method="post" action="{{.CPath "/recurring/%d/run" $r.ID}}" class="stack small">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <p class="small">{{.T "recurring.run_card" $d.Card.Label}}</p>
+        <button class="btn btn-primary btn-block" type="submit" name="mode" value="charge" data-confirm="{{.T "recurring.run_charge_confirm" $d.Card.Label}}">{{template "icon" "card"}}{{.T "recurring.run_charge"}}</button>
+        <button class="btn btn-block" type="submit" name="mode" value="email">{{template "icon" "send"}}{{if $d.CanSend}}{{.T "recurring.run_email"}}{{else}}{{.T "recurring.run_no_charge"}}{{end}}</button>
+        <p class="hint">{{if $d.CanSend}}{{.T "recurring.run_email_hint"}}{{else}}{{.T "recurring.run_no_charge_hint"}}{{end}}</p>
+      </form></div>
+    </details>
+    {{else if $r.Active}}<form method="post" action="{{.CPath "/recurring/%d/run" $r.ID}}" data-confirm="{{.T "recurring.run_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{.T "recurring.run_now"}}</button></form>{{end}}
     <form method="post" action="{{.CPath "/recurring/%d/toggle" $r.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{if $r.Active}}{{.T "recurring.pause"}}{{else}}{{.T "recurring.resume"}}{{end}}</button></form>
   </div>
   {{end}}

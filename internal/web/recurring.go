@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/flocom/invoicer/internal/app"
 	"github.com/flocom/invoicer/internal/money"
 	"github.com/flocom/invoicer/internal/store"
 )
@@ -25,6 +26,7 @@ type recurringFormData struct {
 	Invoices []*store.Invoice
 	Preview  []string
 	CanSend  bool
+	Card     *store.SavedCard // default card charged by "generate now", when automatic charging applies
 }
 
 func (s *Server) recurringForm(c *Ctx) error {
@@ -42,6 +44,9 @@ func (s *Server) recurringForm(c *Ctx) error {
 		}
 		d.R = r
 		d.Invoices, _ = s.Store.RecurringInvoices(co.ID, r.ID)
+		if r.AutoCharge && co.HasStripe() {
+			d.Card, _ = s.Store.DefaultCard(co.ID, r.ClientID)
+		}
 	} else {
 		today := s.App.Today()
 		t, _ := time.Parse("2006-01-02", today)
@@ -238,8 +243,25 @@ func (s *Server) recurringRunNow(c *Ctx) error {
 			return err
 		}
 	}
-	s.App.RunRecurring(c.R.Context())
-	c.audit("recurring.run_now", r.Name)
-	c.ok("recurring.generated_now")
+	// with a saved card, the user chooses between charging it and e-mailing the invoice
+	var opt *app.ManualRun
+	switch c.form("mode") {
+	case "charge":
+		opt = &app.ManualRun{Charge: true}
+	case "email":
+		opt = &app.ManualRun{Charge: false}
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), 60*time.Second)
+	defer cancel()
+	if err := s.App.GenerateRecurringNow(ctx, r, opt); err != nil {
+		c.flash("err", err.Error())
+		return c.redirect(c.cpath("/recurring/%d", r.ID))
+	}
+	c.audit("recurring.run_now", r.Name+" "+c.form("mode"))
+	if r, err := s.Store.Recurring(c.Company.ID, r.ID); err == nil && r.LastError != "" {
+		c.bad("recurring.generated_with_error", r.LastError)
+	} else {
+		c.ok("recurring.generated_now")
+	}
 	return c.redirect(c.cpath("/recurring/%d", r.ID))
 }
