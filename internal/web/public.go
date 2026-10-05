@@ -42,7 +42,7 @@ func (s *Server) publicInvoice(c *Ctx) error {
 	c.Company = nil
 	p := s.page(c, i18n.T(c.Lang, "pdf.invoice")+" "+inv.Number, "", map[string]any{
 		"Invoice": inv, "Co": co, "Seller": inv.Seller(), "Buyer": inv.Buyer(), "TaxGroups": store.TaxGroups(inv.Lines),
-		"CanPay": co.HasStripe() && inv.Status == store.StatusOpen && inv.Due() > 0,
+		"CanPay": inv.CardPayable(co),
 		"Bank":   s.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency),
 		"Paid":   c.R.URL.Query().Get("paid") == "1", "Token": inv.PublicToken, "HasLogo": len(co.Logo) > 0,
 	})
@@ -72,7 +72,7 @@ func (s *Server) publicPay(c *Ctx) error {
 		s.renderError(c, http.StatusTooManyRequests, "err.rate_limited")
 		return nil
 	}
-	if inv.Status != store.StatusOpen || inv.Due() <= 0 || !co.HasStripe() {
+	if !inv.CardPayable(co) {
 		http.Redirect(c.W, c.R, "/i/"+inv.PublicToken, http.StatusSeeOther)
 		return nil
 	}

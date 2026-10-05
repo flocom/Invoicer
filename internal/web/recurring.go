@@ -46,7 +46,7 @@ func (s *Server) recurringForm(c *Ctx) error {
 		today := s.App.Today()
 		t, _ := time.Parse("2006-01-02", today)
 		d.R = &store.Recurring{Currency: co.DefaultCurrency, IntervalUnit: "month", IntervalCount: 1, NextRun: today, AnchorDay: t.Day(),
-			Remaining: -1, DueDays: co.PaymentTermsDays, AutoSend: co.HasResend(), Active: true, Notes: co.DefaultNotes,
+			Remaining: -1, DueDays: co.PaymentTermsDays, AutoSend: co.HasResend(), Active: true, Notes: co.DefaultNotes, CardPayment: true,
 			Lines: []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}}
 		if cid, _ := strconv.ParseInt(c.R.URL.Query().Get("client"), 10, 64); cid != 0 {
 			if cl, err := s.Store.Client(co.ID, cid); err == nil {
@@ -114,6 +114,7 @@ func (s *Server) recurringSave(c *Ctx) error {
 	r.AutoSend = c.form("auto_send") == "1"
 	r.Notes = clip(c.form("notes"), 4000)
 	r.BankAccountID = s.bankChoice(c)
+	r.CardPayment = c.form("card_payment") == "1"
 	if v := c.form("remaining"); v == "" {
 		r.Remaining = -1
 	} else if n, err := strconv.Atoi(v); err == nil && n >= 0 {
