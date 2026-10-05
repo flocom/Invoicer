@@ -28,13 +28,14 @@
 <div class="empty big">{{template "icon" "users"}}<h2>{{.T "invoice.need_client"}}</h2><a class="btn btn-primary" href="{{.CPath "/clients/new?next=%s" (.CPath "/recurring/new")}}">{{.T "client.new"}}</a></div>
 {{else}}
 {{if $r.LastError}}<div class="flash flash-err">{{.T "recurring.last_error"}} {{$r.LastError}}</div>{{end}}
-<form method="post" class="invoice-editor stack" data-invoice-form>
+<form method="post" class="invoice-editor stack" data-invoice-form data-first-run data-today="{{$d.Today}}" data-active="{{if $r.Active}}1{{end}}">
+  <input type="hidden" name="first_mode" value="">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <div class="card stack">
     <div class="grid-4">
       <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}" aria-describedby="name_hint"><p class="hint" id="name_hint">{{.T "recurring.name_hint"}}</p></div>
       <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
-        {{template "clientselect" (dict "P" $ "Clients" $d.Clients "Sel" $r.ClientID "Next" (.CPath "/recurring/new"))}}
+        {{template "clientselect" (dict "P" $ "Clients" $d.Clients "Sel" $r.ClientID "Next" (.CPath "/recurring/new") "Cards" $d.Cards)}}
         <p class="hint">{{.T "recurring.lang_hint"}}</p>
       </div>
     </div>
@@ -75,6 +76,18 @@
   <div class="form-actions sticky-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
 </form>
 {{template "clientdialog" $}}
+{{/* asked when saving a schedule that generates an invoice today (app.js) */}}
+<dialog class="dialog" data-first-run-dialog aria-labelledby="first-run-title">
+  <div class="stack">
+    <h2 id="first-run-title">{{.T "recurring.first_today_title"}}</h2>
+    <p>{{.T "recurring.first_today_body"}}</p>
+    <button type="button" class="btn btn-primary btn-block" data-mode="charge" hidden>{{template "icon" "card"}}{{.T "recurring.first_charge"}} <span data-card-label></span></button>
+    {{if $d.CanSend}}<button type="button" class="btn btn-block" data-mode="email">{{template "icon" "send"}}{{.T "recurring.run_send"}}</button>{{end}}
+    <button type="button" class="btn btn-block" data-mode="none">{{.T "recurring.run_silent"}}</button>
+    <p class="hint" data-charge-hint hidden>{{.T "recurring.first_charge_hint"}}</p>
+    <div class="form-actions align-end"><button type="button" class="btn btn-ghost" data-dialog-close>{{.T "mfa.cancel"}}</button></div>
+  </div>
+</dialog>
 
 {{if not $d.IsNew}}
 <section class="card flush">

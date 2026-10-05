@@ -80,7 +80,7 @@ func (a *App) RunRecurring(ctx context.Context) {
 			return
 		}
 		for _, r := range due {
-			a.generateOnce(ctx, r.CompanyID, r.ID, today)
+			a.generateOnce(ctx, r.CompanyID, r.ID, today, nil)
 		}
 	}
 }
@@ -95,13 +95,13 @@ func (a *App) lockSchedule(id int64) func() {
 
 // generateOnce generates the next invoice of a schedule if it is still due,
 // reading it again under its lock. It reports whether one was generated.
-func (a *App) generateOnce(ctx context.Context, companyID, id int64, today string) bool {
+func (a *App) generateOnce(ctx context.Context, companyID, id int64, today string, opt *ManualRun) bool {
 	defer a.lockSchedule(id)()
 	r, err := a.Store.Recurring(companyID, id)
 	if err != nil || !r.Active || r.NextRun > today {
 		return false
 	}
-	if err := a.generateRecurring(ctx, r, today, nil); err != nil {
+	if err := a.generateRecurring(ctx, r, today, opt); err != nil {
 		slog.Error("recurring: generate", "schedule", r.ID, "err", err)
 		a.Store.SetRecurringError(r.ID, err.Error())
 		return false
@@ -110,11 +110,12 @@ func (a *App) generateOnce(ctx context.Context, companyID, id int64, today strin
 }
 
 // GenerateDue generates the invoices a schedule owes up to today, e.g. right
-// after it is saved with a first run today or in the past.
-func (a *App) GenerateDue(ctx context.Context, companyID, id int64) {
+// after it is saved with a first run today or in the past. opt is the choice
+// made when saving (nil: the schedule's settings).
+func (a *App) GenerateDue(ctx context.Context, companyID, id int64, opt *ManualRun) {
 	today := a.Today()
 	for round := 0; round < 24; round++ { // one period per round, like RunRecurring
-		if !a.generateOnce(ctx, companyID, id, today) {
+		if !a.generateOnce(ctx, companyID, id, today, opt) {
 			return
 		}
 	}
