@@ -287,4 +287,9 @@ ALTER TABLE recurring ADD COLUMN bank_account_id INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE invoices ADD COLUMN card_payment INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE recurring ADD COLUMN card_payment INTEGER NOT NULL DEFAULT 1;
 `,
+	// 5 — clients shared by every company (company_id stays the creating one)
+	`
+ALTER TABLE clients ADD COLUMN shared INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX clients_shared ON clients(shared) WHERE shared = 1;
+`,
 }

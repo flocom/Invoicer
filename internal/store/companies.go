@@ -277,6 +277,7 @@ type Client struct {
 	Currency    string
 	Notes       string
 	Archived    bool
+	Shared      bool // visible and usable in every company
 	CreatedAt   int64
 	// computed
 	Outstanding map[string]int64
@@ -296,12 +297,12 @@ func (c *Client) Recipients() []string {
 	return out
 }
 
-const clientCols = `id, company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, archived, created_at`
+const clientCols = `id, company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, archived, shared, created_at`
 
 func scanClient(row interface{ Scan(...any) error }) (*Client, error) {
 	c := &Client{}
 	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.ContactName, &c.Email, &c.CCEmails, &c.Address, &c.TaxID, &c.Lang,
-		&c.Currency, &c.Notes, &c.Archived, &c.CreatedAt)
+		&c.Currency, &c.Notes, &c.Archived, &c.Shared, &c.CreatedAt)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -309,7 +310,7 @@ func scanClient(row interface{ Scan(...any) error }) (*Client, error) {
 }
 
 func (s *Store) Clients(companyID int64, includeArchived bool, search string) ([]*Client, error) {
-	q := `SELECT ` + clientCols + ` FROM clients WHERE company_id = ?`
+	q := `SELECT ` + clientCols + ` FROM clients WHERE (company_id = ? OR shared = 1)`
 	args := []any{companyID}
 	if !includeArchived {
 		q += ` AND archived = 0`
@@ -340,25 +341,39 @@ func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-// Client loads a client and checks it belongs to the company.
+// Client loads a client and checks it belongs to the company or is shared.
 func (s *Store) Client(companyID, id int64) (*Client, error) {
-	return scanClient(s.DB.QueryRow(`SELECT `+clientCols+` FROM clients WHERE id = ? AND company_id = ?`, id, companyID))
+	return scanClient(s.DB.QueryRow(`SELECT `+clientCols+` FROM clients WHERE id = ? AND (company_id = ? OR shared = 1)`, id, companyID))
 }
 
 func (s *Store) SaveClient(c *Client) error {
 	if c.ID == 0 {
-		res, err := s.DB.Exec(`INSERT INTO clients(company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, created_at)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?)`, c.CompanyID, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes, now())
+		res, err := s.DB.Exec(`INSERT INTO clients(company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, shared, created_at)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, c.CompanyID, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
+			b2i(c.Shared), now())
 		if err != nil {
 			return err
 		}
 		c.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err := s.DB.Exec(`UPDATE clients SET name=?, contact_name=?, email=?, cc_emails=?, address=?, tax_id=?, lang=?, currency=?, notes=?, archived=?
-		WHERE id=? AND company_id=?`, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
-		b2i(c.Archived), c.ID, c.CompanyID)
+	_, err := s.DB.Exec(`UPDATE clients SET name=?, contact_name=?, email=?, cc_emails=?, address=?, tax_id=?, lang=?, currency=?, notes=?, archived=?,
+		shared=? WHERE id=? AND company_id=?`, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
+		b2i(c.Archived), b2i(c.Shared), c.ID, c.CompanyID)
 	return err
+}
+
+// UnshareClient makes a shared client private to companyID again. It refuses
+// (false) while another company still has invoices or recurring invoices for it.
+func (s *Store) UnshareClient(id, companyID int64) (bool, error) {
+	res, err := s.DB.Exec(`UPDATE clients SET shared = 0, company_id = ? WHERE id = ? AND shared = 1
+		AND NOT EXISTS (SELECT 1 FROM invoices WHERE client_id = ? AND company_id != ?)
+		AND NOT EXISTS (SELECT 1 FROM recurring WHERE client_id = ? AND company_id != ?)`, companyID, id, id, companyID, id, companyID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
 }
 
 func (s *Store) ClientOutstanding(companyID int64) (map[int64]map[string]int64, error) {
@@ -387,7 +402,7 @@ func (s *Store) DeleteClient(companyID, id int64) (bool, error) {
 	if n > 0 {
 		return false, nil
 	}
-	_, err := s.DB.Exec(`DELETE FROM clients WHERE id = ? AND company_id = ?`, id, companyID)
+	_, err := s.DB.Exec(`DELETE FROM clients WHERE id = ? AND (company_id = ? OR shared = 1)`, id, companyID)
 	return err == nil, err
 }
 
@@ -402,21 +417,26 @@ func idsArgs(ids []int64) []any {
 // ---------- client copies across companies ----------
 
 // RelatedClient is the same customer (same e-mail, or same name when there is
-// no e-mail) in another company the user can access.
+// no e-mail) in another company the user can access. A shared client is
+// related to itself in every other company.
 type RelatedClient struct {
 	CompanyID   int64
 	CompanyName string
 	ClientID    int64
 }
 
-func (s *Store) RelatedClients(u *User, cl *Client) ([]RelatedClient, error) {
+func (s *Store) RelatedClients(u *User, cl *Client, currentCompany int64) ([]RelatedClient, error) {
 	cos, err := s.CompaniesFor(u, false)
 	if err != nil {
 		return nil, err
 	}
 	var out []RelatedClient
 	for _, co := range cos {
-		if co.ID == cl.CompanyID {
+		if co.ID == currentCompany {
+			continue
+		}
+		if cl.Shared {
+			out = append(out, RelatedClient{CompanyID: co.ID, CompanyName: co.Name, ClientID: cl.ID})
 			continue
 		}
 		var id int64
@@ -441,6 +461,7 @@ func (s *Store) CopyClient(src *Client, targetCompany int64) (*Client, error) {
 	c.ID = 0
 	c.CompanyID = targetCompany
 	c.Archived = false
+	c.Shared = false
 	if err := s.SaveClient(&c); err != nil {
 		return nil, err
 	}

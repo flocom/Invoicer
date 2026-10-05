@@ -172,6 +172,7 @@
       <div class="field"><label for="qc_currency">{{.T "field.currency"}}</label>
         <select id="qc_currency" name="currency"><option value="">{{.T "field.company_default"}}</option>{{range currencies}}<option>{{.}}</option>{{end}}</select></div>
     </div>
+    <label class="check"><input type="checkbox" name="shared" value="1"> {{.T "client.share"}}</label>
     <p class="hint">{{.T "client.quick_hint"}}</p>
     <div class="form-actions align-end">
       <button class="btn" type="button" data-dialog-close>{{.T "mfa.cancel"}}</button>
