@@ -20,7 +20,7 @@
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <div class="card stack">
     <div class="grid-4">
-      <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}"></div>
+      <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}" aria-describedby="name_hint"><p class="hint" id="name_hint">{{.T "recurring.name_hint"}}</p></div>
       <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
         <select id="client_id" name="client_id" required data-client-select>
           <option value="">{{.T "invoice.choose_client"}}</option>
