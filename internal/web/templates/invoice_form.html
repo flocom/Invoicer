@@ -35,11 +35,21 @@
     <label class="check"><input type="checkbox" name="reminders" value="1" {{if $inv.RemindersEnabled}}checked{{end}}> {{.T "invoice.auto_reminders"}}</label>
   </div>
 
-  {{if $d.CanSend}}<div class="card stack small send-options">{{template "bankmail" (dict "P" $ "Any" $d.Banks)}}</div>{{end}}
   <div class="form-actions sticky-actions">
     <button class="btn" type="submit" name="action" value="save">{{.T "invoice.save_draft"}}</button>
-    <button class="btn" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.save_issue"}}</button>
-    {{if $d.CanSend}}<button class="btn btn-primary" type="submit" name="action" value="send" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.save_send"}}</button>{{end}}
+    {{if $d.CanSend}}
+    <details class="menu menu-up">
+      <summary class="btn btn-primary">{{.T "invoice.save_issue"}} ▾</summary>
+      <div class="menu-panel stack small">
+        <p class="small"><strong>{{.T "invoice.ask_send"}}</strong></p>
+        <button class="btn btn-primary btn-block" type="submit" name="action" value="send" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.issue_and_send"}}</button>
+        {{template "bankmail" (dict "P" $ "Any" $d.Banks)}}
+        <button class="btn btn-block" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.issue_no_send"}}</button>
+      </div>
+    </details>
+    {{else}}
+    <button class="btn btn-primary" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.save_issue"}}</button>
+    {{end}}
   </div>
 </form>
 {{template "clientdialog" $}}

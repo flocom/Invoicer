@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flocom/invoicer/internal/app"
 	"github.com/flocom/invoicer/internal/store"
 )
 
@@ -86,3 +87,5 @@ func TestGenerateNowChargeOrEmail(t *testing.T) {
 
 // tomorrow is a first run date that saving a schedule does not generate.
 func tomorrow() string { return time.Now().AddDate(0, 0, 1).Format("2006-01-02") }
+
+func runTokenOf(r *store.Recurring) string { return app.RunToken(r) }

@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -180,13 +181,12 @@ func (s *Server) recurringSave(c *Ctx) error {
 		c.audit("recurring.created", r.Name)
 	}
 	c.ok("recurring.saved")
-	// generate immediately if the first run is today or in the past
+	// generate now if the first run is today or in the past, before showing
+	// the schedule, so that "generate now" then means the next period
 	if r.Active && r.NextRun <= s.App.Today() {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			s.App.RunRecurring(ctx)
-		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		s.App.GenerateDue(ctx, c.Company.ID, r.ID)
 	}
 	return c.redirect(c.cpath("/recurring/%d", r.ID))
 }
@@ -236,24 +236,22 @@ func (s *Server) recurringRunNow(c *Ctx) error {
 		c.bad("recurring.inactive")
 		return c.redirect(c.cpath("/recurring/%d", r.ID))
 	}
-	today := s.App.Today()
-	if r.NextRun > today {
-		r.NextRun = today
-		if err := s.Store.SaveRecurring(r); err != nil {
-			return err
-		}
-	}
 	// with a saved card, the user chooses between charging it and e-mailing the invoice
 	var opt *app.ManualRun
 	switch c.form("mode") {
 	case "charge":
 		opt = &app.ManualRun{Charge: true}
 	case "email":
-		opt = &app.ManualRun{Charge: false}
+		opt = &app.ManualRun{Email: true}
+	case "none":
+		opt = &app.ManualRun{}
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 60*time.Second)
 	defer cancel()
-	if err := s.App.GenerateRecurringNow(ctx, r, opt); err != nil {
+	if err := s.App.GenerateRecurringNow(ctx, c.Company.ID, r.ID, c.form("expect"), opt); errors.Is(err, app.ErrAlreadyGenerated) {
+		c.flash("info", c.t("recurring.already_generated"))
+		return c.redirect(c.cpath("/recurring/%d", r.ID))
+	} else if err != nil {
 		c.flash("err", err.Error())
 		return c.redirect(c.cpath("/recurring/%d", r.ID))
 	}

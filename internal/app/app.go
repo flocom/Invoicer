@@ -37,8 +37,9 @@ type App struct {
 	mu  sync.RWMutex
 	loc *time.Location
 
-	checkoutLocks sync.Map // invoice id → *sync.Mutex
-	customerLocks sync.Map // "company:client" → *sync.Mutex
+	checkoutLocks  sync.Map // invoice id → *sync.Mutex
+	customerLocks  sync.Map // "company:client" → *sync.Mutex
+	recurringLocks sync.Map // schedule id → *sync.Mutex
 }
 
 func New(cfg config.Config, st *store.Store, box *security.Box, up *updater.Updater) *App {
