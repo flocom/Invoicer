@@ -97,6 +97,18 @@ func (s *Server) lineSuggest(c *Ctx) error {
 	return c.json(200, map[string]any{"suggestions": list})
 }
 
+// lineSuggestHide removes a suggestion from the list (until used again).
+func (s *Server) lineSuggestHide(c *Ctx) error {
+	d := strings.TrimSpace(c.R.PostFormValue("description"))
+	if d == "" || len(d) > 4000 {
+		return c.json(400, map[string]string{"error": "bad request"})
+	}
+	if err := s.Store.HideLineSuggestion(c.Company.ID, d); err != nil {
+		return err
+	}
+	return c.json(200, map[string]bool{"ok": true})
+}
+
 func (s *Server) systemAddress(c *Ctx) error {
 	provider := c.form("provider")
 	if provider != geo.ProviderOSM && provider != geo.ProviderGoogle && provider != geo.ProviderOff {

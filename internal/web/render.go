@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/flocom/invoicer/internal/app"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -25,10 +26,11 @@ type templates struct {
 }
 
 var funcs = template.FuncMap{
-	"lines": i18n.Lines,
-	"add":   func(a, b int) int { return a + b },
-	"upper": strings.ToUpper,
-	"join":  strings.Join,
+	"lines":    i18n.Lines,
+	"add":      func(a, b int) int { return a + b },
+	"runToken": app.RunToken,
+	"upper":    strings.ToUpper,
+	"join":     strings.Join,
 	"contains": func(list []string, v string) bool {
 		for _, x := range list {
 			if x == v {

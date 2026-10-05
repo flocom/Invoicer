@@ -82,8 +82,10 @@
       active = i;
       if (nodes[i]) { field.setAttribute("aria-activedescendant", nodes[i].id); nodes[i].scrollIntoView({ block: "nearest" }); }
     }
+    var footer = "";
     function show(res) {
       items = res.items || [];
+      footer = res.footer || "";
       list.textContent = "";
       if (!items.length) { close(); return; }
       items.forEach(function (it, i) {
@@ -95,10 +97,26 @@
         main.textContent = it.label;
         el.appendChild(main);
         if (it.meta) { var m = document.createElement("span"); m.className = "ac-meta"; m.textContent = it.meta; el.appendChild(m); }
+        if (opts.remove) {
+          var x = document.createElement("button");
+          x.type = "button";
+          x.className = "ac-remove";
+          x.textContent = "×";
+          x.title = opts.removeLabel || "Remove";
+          x.setAttribute("aria-label", x.title);
+          x.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            opts.remove(it).then(function () {
+              show({ items: items.filter(function (o) { return o !== it; }), footer: footer });
+            }).catch(function () {});
+          });
+          el.appendChild(x);
+        }
         el.addEventListener("mousedown", function (e) { e.preventDefault(); pick(i); });
         list.appendChild(el);
       });
-      if (res.footer) { var f = document.createElement("div"); f.className = "ac-foot"; f.textContent = res.footer; list.appendChild(f); }
+      if (footer) { var f = document.createElement("div"); f.className = "ac-foot"; f.textContent = footer; list.appendChild(f); }
       list.hidden = false;
       active = -1;
     }
@@ -176,6 +194,16 @@
           return { items: (r.suggestions || []).map(function (s) {
             return { label: s.description, meta: s.price + " " + s.currency + " · " + s.tax + " %", s: s };
           }) };
+        });
+      },
+      removeLabel: root.getAttribute("data-suggest-remove"),
+      remove: function (it) {
+        var body = new FormData();
+        body.append("description", it.s.description);
+        var csrf = form && form.querySelector("input[name=csrf]");
+        return fetch(root.getAttribute("data-suggest") + "/hide", { method: "POST", body: body, credentials: "same-origin",
+          headers: { Accept: "application/json", "X-CSRF-Token": csrf ? csrf.value : "" } }).then(function (r) {
+          if (!r.ok) throw new Error(r.status);
         });
       },
       pick: function (it) {

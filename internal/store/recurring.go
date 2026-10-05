@@ -27,6 +27,7 @@ type Recurring struct {
 	BankAccountID int64
 	CardPayment   bool
 	AutoCharge    bool // charge the client's saved card on each generated invoice
+	Generated     int  // invoices generated so far
 	CreatedAt     int64
 
 	Lines      []Line
@@ -70,12 +71,12 @@ func (r *Recurring) Advance(from string) string {
 }
 
 const recurringCols = `r.id, r.company_id, r.client_id, r.name, r.currency, r.interval_unit, r.interval_count, r.anchor_day, r.next_run,
-	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment, r.auto_charge`
+	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment, r.auto_charge, r.generated`
 
 func scanRecurring(row interface{ Scan(...any) error }) (*Recurring, error) {
 	r := &Recurring{}
 	err := row.Scan(&r.ID, &r.CompanyID, &r.ClientID, &r.Name, &r.Currency, &r.IntervalUnit, &r.IntervalCount, &r.AnchorDay,
-		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment, &r.AutoCharge)
+		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment, &r.AutoCharge, &r.Generated)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -204,6 +205,17 @@ func (s *Store) AdvanceRecurring(id int64, expected, next string, remaining int,
 	return n == 1, nil
 }
 
+// MoveRecurringNextRun brings the next run of a schedule forward, only if it
+// is still the expected date (false: it changed meanwhile).
+func (s *Store) MoveRecurringNextRun(companyID, id int64, from, to string) (bool, error) {
+	res, err := s.DB.Exec(`UPDATE recurring SET next_run = ? WHERE id = ? AND company_id = ? AND next_run = ?`, to, id, companyID, from)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
 func (s *Store) SetRecurringError(id int64, msg string) {
 	s.DB.Exec(`UPDATE recurring SET last_error = ? WHERE id = ?`, msg, id)
 }
@@ -224,8 +236,8 @@ func (s *Store) DeleteRecurring(companyID, id int64) error {
 func (s *Store) GenerateFromRecurring(r *Recurring, inv *Invoice, next string, remaining int, active bool) error {
 	inv.Subtotal, inv.TaxTotal, inv.Total = ComputeTotals(inv.Lines)
 	return withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
-		res, err := tx.Exec(`UPDATE recurring SET next_run = ?, remaining = ?, active = ?, last_run_at = ?, last_error = ''
-			WHERE id = ? AND next_run = ? AND active = 1`, next, remaining, b2i(active), now(), r.ID, r.NextRun)
+		res, err := tx.Exec(`UPDATE recurring SET next_run = ?, remaining = ?, active = ?, last_run_at = ?, last_error = '',
+			generated = generated + 1 WHERE id = ? AND next_run = ? AND active = 1`, next, remaining, b2i(active), now(), r.ID, r.NextRun)
 		if err != nil {
 			return err
 		}

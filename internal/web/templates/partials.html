@@ -32,7 +32,7 @@
 
 {{define "lines"}}
 {{$p := .P}}
-<div class="lines" data-lines data-currency="{{.Currency}}" data-lang="{{$p.Lang}}" data-suggest="{{$p.CPath "/api/lines"}}">
+<div class="lines" data-lines data-currency="{{.Currency}}" data-lang="{{$p.Lang}}" data-suggest="{{$p.CPath "/api/lines"}}" data-suggest-remove="{{$p.T "line.suggest_remove"}}">
   <div class="lines-head">
     <span>{{$p.T "line.description"}}</span><span>{{$p.T "line.qty"}}</span><span>{{$p.T "line.unit_price"}}</span><span>{{$p.T "line.tax"}}</span><span class="r">{{$p.T "line.amount"}}</span><span></span>
   </div>

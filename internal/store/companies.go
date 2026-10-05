@@ -482,10 +482,35 @@ type LineSuggestion struct {
 
 // LineSuggestions returns distinct descriptions matching q (most recent use
 // first) with the last price and tax rate used.
+func suggestionKey(description string) string { return strings.ToLower(strings.TrimSpace(description)) }
+
+// HideLineSuggestion removes a product or service from the suggestions until
+// it is invoiced again.
+func (s *Store) HideLineSuggestion(companyID int64, description string) error {
+	k := suggestionKey(description)
+	if k == "" {
+		return nil
+	}
+	_, err := s.DB.Exec(`INSERT INTO hidden_suggestions(company_id, description, hidden_at) VALUES(?,?,?)
+		ON CONFLICT(company_id, description) DO UPDATE SET hidden_at = excluded.hidden_at`, companyID, k, now())
+	return err
+}
+
 func (s *Store) LineSuggestions(companyID int64, q string, limit int) ([]LineSuggestion, error) {
 	like := "%" + escapeLike(strings.TrimSpace(q)) + "%"
-	rows, err := s.DB.Query(`SELECT description, unit_price, tax_bp, currency FROM (
-			SELECT l.description, l.unit_price, l.tax_bp, i.currency, i.updated_at AS t, l.id AS lid
+	hidden := map[string]int64{}
+	if hr, err := s.DB.Query(`SELECT description, hidden_at FROM hidden_suggestions WHERE company_id = ?`, companyID); err == nil {
+		for hr.Next() {
+			var k string
+			var at int64
+			if hr.Scan(&k, &at) == nil {
+				hidden[k] = at
+			}
+		}
+		hr.Close()
+	}
+	rows, err := s.DB.Query(`SELECT description, unit_price, tax_bp, currency, t FROM (
+			SELECT l.description, l.unit_price, l.tax_bp, i.currency, i.created_at AS t, l.id AS lid
 			FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id
 			WHERE i.company_id = ? AND l.description LIKE ? ESCAPE '\'
 			UNION ALL
@@ -501,14 +526,18 @@ func (s *Store) LineSuggestions(companyID int64, q string, limit int) ([]LineSug
 	var out []LineSuggestion
 	for rows.Next() {
 		var l LineSuggestion
-		if err := rows.Scan(&l.Description, &l.UnitPrice, &l.TaxBP, &l.Currency); err != nil {
+		var used int64
+		if err := rows.Scan(&l.Description, &l.UnitPrice, &l.TaxBP, &l.Currency, &used); err != nil {
 			return nil, err
 		}
-		k := strings.ToLower(strings.TrimSpace(l.Description))
+		k := suggestionKey(l.Description)
 		if seen[k] || k == "" {
 			continue
 		}
 		seen[k] = true
+		if at, ok := hidden[k]; ok && used <= at {
+			continue // removed from the list and not used since
+		}
 		out = append(out, l)
 		if len(out) >= limit {
 			break
