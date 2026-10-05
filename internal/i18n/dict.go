@@ -316,6 +316,10 @@ var ui = [][3]string{
 
 	{"client.new", "New client", "Nouveau client"},
 	{"client.new_short", "Client", "Client"},
+	{"client.shared", "Shared", "Partagé"},
+	{"client.share", "Share with all companies", "Partager avec toutes les entreprises"},
+	{"client.share_hint", "A single client record, visible and usable in every company. Changes apply everywhere.", "Une seule fiche client, visible et utilisable dans toutes les entreprises. Les modifications s'appliquent partout."},
+	{"client.unshare_in_use", "Other companies have invoices or recurring invoices for this client: it must stay shared.", "D'autres entreprises ont des factures ou des factures récurrentes pour ce client : il doit rester partagé."},
 	{"client.search_ph", "Search or create a client…", "Rechercher ou créer un client…"},
 	{"client.create_named", "Create client “%s”", "Créer le client « %s »"},
 	{"client.no_match", "No client found.", "Aucun client trouvé."},

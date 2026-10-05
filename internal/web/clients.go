@@ -39,7 +39,7 @@ func (s *Server) clientView(c *Ctx) error {
 	cl.Outstanding = out[cl.ID]
 
 	// the same customer in the user's other companies, with their invoices
-	related, _ := s.Store.RelatedClients(c.User, cl)
+	related, _ := s.Store.RelatedClients(c.User, cl, c.Company.ID)
 	type otherInvoice struct {
 		CompanyID   int64
 		CompanyName string
@@ -104,6 +104,7 @@ func readClientForm(c *Ctx, cl *store.Client) {
 		cl.Currency = ""
 	}
 	cl.Notes = clip(c.form("notes"), 2000)
+	cl.Shared = c.form("shared") == "1"
 }
 
 // validateClient returns the message key of the first invalid field, or "".
@@ -143,13 +144,29 @@ func (s *Server) clientSave(c *Ctx) error {
 			return err
 		}
 	}
+	wasShared := cl.Shared
 	readClientForm(c, cl)
 	cl.Archived = c.form("archived") == "1"
 	next := safeNext(c.form("next"))
-	if key := validateClient(cl); key != "" {
+	fail := func(key string) error {
 		p := s.page(c, c.t("client.new"), "clients", map[string]any{"Client": cl, "Next": next})
 		p.Error = c.t(key)
 		return s.render(c, 400, "client_form", p)
+	}
+	if key := validateClient(cl); key != "" {
+		return fail(key)
+	}
+	if wasShared && !cl.Shared {
+		// back to a client of the current company only
+		ok, err := s.Store.UnshareClient(cl.ID, c.Company.ID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			cl.Shared = true
+			return fail("client.unshare_in_use")
+		}
+		cl.CompanyID = c.Company.ID
 	}
 	isNew := cl.ID == 0
 	if err := s.Store.SaveClient(cl); err != nil {
@@ -179,7 +196,7 @@ func (s *Server) clientCopy(c *Ctx) error {
 	if target == c.Company.ID || !s.Store.CanAccessCompany(c.User, target) {
 		return errForbidden
 	}
-	related, _ := s.Store.RelatedClients(c.User, cl)
+	related, _ := s.Store.RelatedClients(c.User, cl, c.Company.ID)
 	for _, r := range related {
 		if r.CompanyID == target {
 			c.ok("client.already_there", r.CompanyName)

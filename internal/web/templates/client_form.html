@@ -28,6 +28,8 @@
       <select id="currency" name="currency"><option value="">{{.T "field.company_default"}}</option>{{range currencies}}<option {{if eq . $cl.Currency}}selected{{end}}>{{.}}</option>{{end}}</select></div>
   </div>
   <div class="field"><label for="notes">{{.T "field.internal_notes"}}</label><textarea id="notes" name="notes" rows="2" maxlength="2000">{{$cl.Notes}}</textarea></div>
+  <div><label class="check"><input type="checkbox" name="shared" value="1" {{if $cl.Shared}}checked{{end}}> {{.T "client.share"}}</label>
+    <p class="hint">{{.T "client.share_hint"}}</p></div>
   {{if $cl.ID}}<label class="check"><input type="checkbox" name="archived" value="1" {{if $cl.Archived}}checked{{end}}> {{.T "client.archive"}}</label>{{end}}
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">{{.T "action.save"}}</button>

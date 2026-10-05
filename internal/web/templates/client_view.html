@@ -3,7 +3,7 @@
 <div class="page-head">
   <div>
     <a class="back" href="{{.CPath "/clients"}}">← {{.T "nav.clients"}}</a>
-    <h1>{{$cl.Name}} {{if $cl.Archived}}<span class="badge badge-void">{{.T "client.archived"}}</span>{{end}}</h1>
+    <h1>{{$cl.Name}} {{if $cl.Shared}}<span class="chip">{{.T "client.shared"}}</span>{{end}} {{if $cl.Archived}}<span class="badge badge-void">{{.T "client.archived"}}</span>{{end}}</h1>
   </div>
   <div class="actions">
     <a class="btn" href="{{.CPath "/clients/%d/edit" $cl.ID}}">{{.T "action.edit"}}</a>
