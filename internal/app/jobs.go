@@ -108,7 +108,7 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 	copy(lines, r.Lines)
 	inv := &store.Invoice{CompanyID: co.ID, ClientID: cl.ID, Currency: r.Currency, Lang: cl.Lang, IssueDate: issue,
 		DueDate: due.AddDate(0, 0, r.DueDays).Format("2006-01-02"), Notes: r.Notes, PublicToken: security.Token(24),
-		RemindersEnabled: true, Lines: lines}
+		RemindersEnabled: true, CardPayment: r.CardPayment, Lines: lines}
 	remaining := r.Remaining
 	if remaining > 0 {
 		remaining--

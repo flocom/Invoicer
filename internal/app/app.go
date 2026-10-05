@@ -153,7 +153,7 @@ func (a *App) PDF(co *store.Company, inv *store.Invoice) ([]byte, error) {
 	} else {
 		in.Seller, in.Buyer = inv.Seller(), inv.Buyer()
 	}
-	if co.HasStripe() && inv.Status == store.StatusOpen && a.BaseURL() != "" {
+	if inv.CardPayable(co) && a.BaseURL() != "" {
 		in.PayURL = a.PayURL(inv)
 	}
 	in.Bank = a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency)

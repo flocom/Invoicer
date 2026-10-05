@@ -125,12 +125,11 @@
     </div>
     {{end}}
 
-    {{if and $d.Banks (or (eq $inv.Status "open") (eq $inv.Status "draft"))}}
+    {{if or (eq $inv.Status "open") (eq $inv.Status "draft")}}
     <form method="post" action="{{.CPath "/invoices/%d/bank" $inv.ID}}" class="card stack small">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <h3>{{.T "field.bank_account"}}</h3>
-      {{template "bankselect" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID)}}
-      <p class="hint">{{if $d.Bank}}{{.T "bank.shown" $d.Bank.Name}}{{else}}{{.T "bank.none_shown"}}{{end}}</p>
+      {{template "paymentmethods" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID "Card" $inv.CardPayment)}}
+      {{if $d.Banks}}<p class="hint">{{if $d.Bank}}{{.T "bank.shown" $d.Bank.Name}}{{else}}{{.T "bank.none_shown"}}{{end}}</p>{{end}}
       <button class="btn btn-sm" type="submit">{{.T "action.save"}}</button>
     </form>
     {{end}}

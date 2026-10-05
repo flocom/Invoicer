@@ -120,7 +120,7 @@
 
 {{define "bankselect"}}
 {{$p := .P}}
-<select name="bank_account" aria-label="{{$p.T "field.bank_account"}}">
+<select name="bank_account" {{with .ID}}id="{{.}}"{{end}} aria-label="{{$p.T "field.bank_account"}}">
   <option value="auto" {{if eq .Sel 0}}selected{{end}}>{{$p.T "bank.auto"}}</option>
   {{range .Banks}}<option value="{{.ID}}" {{if eq $.Sel .ID}}selected{{end}}>{{.Name}}</option>{{end}}
   <option value="none" {{if eq .Sel -1}}selected{{end}}>{{$p.T "bank.none"}}</option>
@@ -179,4 +179,23 @@
     </div>
   </form>
 </dialog>
+{{end}}
+
+{{/* payment methods offered on an invoice: online card (Stripe) and bank transfer */}}
+{{define "paymentmethods"}}{{$p := .P}}
+<fieldset class="field stack small">
+  <legend>{{$p.T "pay.methods"}}</legend>
+  {{if $p.Company.HasStripe}}
+  <label class="check"><input type="checkbox" name="card_payment" value="1" {{if .Card}}checked{{end}}> {{$p.T "pay.card"}}</label>
+  {{else}}
+  <input type="hidden" name="card_payment" value="{{if .Card}}1{{end}}">
+  <div><label class="check muted"><input type="checkbox" disabled> {{$p.T "pay.card"}}</label>
+    <p class="hint">{{$p.T "pay.card_unavailable"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments"}}">{{$p.T "action.configure"}}</a>{{end}}</p></div>
+  {{end}}
+  <div class="field"><label for="bank_account">{{$p.T "pay.transfer"}}</label>
+    {{if .Banks}}{{template "bankselect" (dict "P" $p "Banks" .Banks "Sel" .Sel "ID" "bank_account")}}
+    <p class="hint">{{$p.T "bank.choice_hint"}}</p>
+    {{else}}<p class="hint">{{$p.T "pay.no_bank"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments#banks"}}">{{$p.T "settings.add_bank_account"}}</a>{{end}}</p>{{end}}
+  </div>
+</fieldset>
 {{end}}

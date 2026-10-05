@@ -294,7 +294,8 @@ func Render(in Input) ([]byte, error) {
 		p.CellFormat(content, 5, strings.ToUpper(t("pdf.payment")), "", 1, "L", false, 0, "")
 		p.SetTextColor(60, 65, 78)
 		textW := content
-		qrPNG := epcQR(bank, inv, in.Seller.Name)
+		qrPNG, qrKey := paymentQR(in)
+		qrCaption := t(qrKey)
 		if qrPNG != nil {
 			textW = content - 34
 		}
@@ -341,12 +342,12 @@ func Render(in Input) ([]byte, error) {
 		}
 		if qrPNG != nil {
 			opt := fpdf.ImageOptions{ImageType: "PNG"}
-			p.RegisterImageOptionsReader("epc", opt, bytes.NewReader(qrPNG))
-			p.ImageOptions("epc", pageW-margin-30, boxY+5, 30, 30, false, opt, 0, "")
+			p.RegisterImageOptionsReader("payqr", opt, bytes.NewReader(qrPNG))
+			p.ImageOptions("payqr", pageW-margin-30, boxY+5, 30, 30, false, opt, 0, in.PayURL)
 			p.SetFont("lato", "", 7)
 			p.SetTextColor(120, 124, 135)
 			p.SetXY(pageW-margin-32, boxY+35.5)
-			p.CellFormat(34, 3.5, t("pdf.scan_to_pay"), "", 1, "C", false, 0, "")
+			p.CellFormat(34, 3.5, qrCaption, "", 1, "C", false, 0, "")
 			p.SetY(max(p.GetY(), boxY+40))
 		}
 		p.SetY(max(p.GetY(), boxY) + 4)
@@ -447,6 +448,28 @@ func formatIBAN(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+// paymentQR returns the QR code printed next to the payment details and the
+// key of its caption: the online payment page when card payment is offered,
+// otherwise a SEPA transfer (EUR only), or nil.
+func paymentQR(in Input) ([]byte, string) {
+	if code := urlQR(in.PayURL); code != nil {
+		return code, "pdf.scan_to_pay_online"
+	}
+	return epcQR(in.Bank, in.Invoice, in.Seller.Name), "pdf.scan_to_pay"
+}
+
+// urlQR encodes a payment link (nil when there is none).
+func urlQR(link string) []byte {
+	if link == "" {
+		return nil
+	}
+	code, err := qr.Encode(link, qr.M)
+	if err != nil {
+		return nil
+	}
+	return code.PNG()
 }
 
 // epcQR builds a SEPA credit transfer QR code (EPC069-12) for EUR invoices,

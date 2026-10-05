@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -40,3 +41,23 @@ func TestRender(t *testing.T) {
 		}
 	}
 }
+
+func TestPaymentQR(t *testing.T) {
+	in := sample("fr", "open")
+	if code, key := paymentQR(in); code == nil || key != "pdf.scan_to_pay_online" {
+		t.Fatalf("with a pay link: %v %s", code != nil, key)
+	}
+	if !bytes.Equal(must(paymentQR(in)), urlQR(in.PayURL)) {
+		t.Fatal("QR should encode the pay link")
+	}
+	in.PayURL = "" // card payment not offered: SEPA transfer
+	if code, key := paymentQR(in); code == nil || key != "pdf.scan_to_pay" {
+		t.Fatalf("without a pay link: %v %s", code != nil, key)
+	}
+	in.Bank = nil
+	if code, _ := paymentQR(in); code != nil {
+		t.Fatal("no QR without pay link nor bank")
+	}
+}
+
+func must(b []byte, _ string) []byte { return b }

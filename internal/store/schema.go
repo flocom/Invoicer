@@ -282,4 +282,9 @@ INSERT INTO bank_accounts(company_id, currency, holder, bank_name, iban, bic, ex
 ALTER TABLE invoices ADD COLUMN bank_account_id INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE recurring ADD COLUMN bank_account_id INTEGER NOT NULL DEFAULT 0;
 `,
+	// 4 — online card payment (Stripe) can be turned off per invoice
+	`
+ALTER TABLE invoices ADD COLUMN card_payment INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE recurring ADD COLUMN card_payment INTEGER NOT NULL DEFAULT 1;
+`,
 }
