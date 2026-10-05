@@ -22,7 +22,7 @@ type Content struct {
 	DueDate     string // formatted
 	DaysLate    int
 	Link        string
-	Link2       string // secondary link (charge_failed: pay the invoice)
+	Link2       string // secondary link: pay online by card (Stripe Checkout)
 	Card        string // saved card label (charge_failed)
 	Message     string // optional custom message from the sender
 	Bank        [][2]string
@@ -77,7 +77,7 @@ func Render(c Content) (subject, html, text string) {
 	c.Accent = brand.Readable(c.Accent) // white button text stays legible
 	t := func(k string, a ...any) string { return i18n.T(l, k, a...) }
 	v := view{Content: c, AmountLabel: t("mail.amount_due"), DueLabel: t("mail.due_date"), Button: t("mail.view_pay"),
-		Closing: t("mail.closing"), BankTitle: t("pdf.bank_transfer")}
+		Button2: t("mail.pay_by_card"), Closing: t("mail.closing"), BankTitle: t("pdf.bank_transfer")}
 	greet := t("mail.hello")
 	if c.ClientName != "" {
 		greet = t("mail.hello_name", c.ClientName)
@@ -106,6 +106,7 @@ func Render(c Content) (subject, html, text string) {
 		v.AmountLabel = t("mail.amount_paid")
 		v.DueDate = ""
 		v.Button = t("mail.view_invoice")
+		v.Link2 = "" // already paid
 	case "charge_failed":
 		v.Subject = t("mail.charge_failed.subject", c.Number)
 		v.Heading = t("mail.charge_failed.heading")
@@ -153,8 +154,8 @@ func Render(c Content) (subject, html, text string) {
 	if c.Link != "" {
 		tb.WriteString(v.Button + ": " + c.Link + "\n\n")
 	}
-	if c.Link2 != "" {
-		tb.WriteString(v.Button2 + ": " + c.Link2 + "\n\n")
+	if v.Link2 != "" {
+		tb.WriteString(v.Button2 + ": " + v.Link2 + "\n\n")
 	}
 	tb.WriteString(v.Closing + "\n" + c.CompanyName + "\n")
 	return v.Subject, buf.String(), tb.String()

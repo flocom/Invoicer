@@ -467,3 +467,4 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); }
 /* ---------- sent e-mails ---------- */
 .mail-frame { width: 100%; height: 720px; border: 1px solid var(--border); background: #f4f4f7; display: block; }
 .mail-text { white-space: pre-wrap; word-break: break-word; font-size: .85rem; margin: .75rem 0 0; }
+.charge-row { margin: .75rem 0; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }

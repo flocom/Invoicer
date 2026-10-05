@@ -208,6 +208,9 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 	c := mailer.Content{Lang: lang, Kind: kind, CompanyName: co.DisplayName(), Accent: co.AccentColor, ClientName: firstNonEmpty(cl.ContactName, cl.Name),
 		Number: inv.Number, Amount: money.Format(inv.Due(), inv.Currency, lang), DueDate: i18n.Date(lang, inv.DueDate),
 		Link: a.PublicURL(inv), Message: message}
+	if inv.CardPayable(co) && a.BaseURL() != "" {
+		c.Link2 = a.PayURL(inv) // straight to Stripe Checkout
+	}
 	if kind == "reminder_overdue" {
 		if d, err := time.Parse("2006-01-02", inv.DueDate); err == nil {
 			today, _ := time.Parse("2006-01-02", a.Today())
