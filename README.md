@@ -110,7 +110,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 <td><img src="docs/images/recurring.png" alt="Recurring invoices"><p align="center"><sub>Subscriptions on autopilot</sub></p></td>
 </tr>
 <tr>
-<td><img src="docs/images/dashboard-dark.png" alt="Dark mode dashboard"><p align="center"><sub>Automatic dark mode</sub></p></td>
+<td><img src="docs/images/dashboard.png" alt="Dashboard"><p align="center"><sub>Everything at a glance</sub></p></td>
 <td><img src="docs/images/settings-payments.png" alt="Stripe settings"><p align="center"><sub>Connect Stripe with one key</sub></p></td>
 </tr>
 </table>
