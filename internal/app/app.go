@@ -145,6 +145,11 @@ func (a *App) SealResend(c *store.Company, key string) []byte {
 // PDF renders an invoice. Issued invoices use the identities frozen at issue
 // time; drafts use the live company and client records.
 func (a *App) PDF(co *store.Company, inv *store.Invoice) ([]byte, error) {
+	return pdf.Render(a.PDFInput(co, inv))
+}
+
+// PDFInput gathers what the invoice PDF shows.
+func (a *App) PDFInput(co *store.Company, inv *store.Invoice) pdf.Input {
 	in := pdf.Input{Invoice: inv, Company: co, Today: a.Today()}
 	if inv.Status == store.StatusDraft || inv.CompanySnapshot == "" {
 		in.Seller = store.Party{Name: co.DisplayName(), Address: co.Address, Email: co.Email, Phone: co.Phone, Website: co.Website,
@@ -155,11 +160,11 @@ func (a *App) PDF(co *store.Company, inv *store.Invoice) ([]byte, error) {
 	} else {
 		in.Seller, in.Buyer = inv.Seller(), inv.Buyer()
 	}
-	if inv.CardPayable(co) && a.BaseURL() != "" {
+	if inv.CardOffered(co) && a.BaseURL() != "" {
 		in.PayURL = a.PayURL(inv)
 	}
 	in.Bank = a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency)
-	return pdf.Render(in)
+	return in
 }
 
 func FileName(inv *store.Invoice) string {

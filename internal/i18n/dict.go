@@ -486,6 +486,7 @@ var invoicesUI = [][3]string{
 	{"invoice.due_date", "Due date", "Échéance"},
 	{"invoice.status", "Status", "Statut"},
 	{"invoice.draft", "Draft", "Brouillon"},
+	{"invoice.number_on_issue", "Number assigned on issue", "Numéro attribué à l'émission"},
 	{"invoice.due", "Due", "Reste"},
 	{"invoice.count", "%d invoice(s)", "%d facture(s)"},
 	{"invoice.search_ph", "Number, client…", "Numéro, client…"},

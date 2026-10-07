@@ -401,6 +401,13 @@ func (i *Invoice) CardPayable(co *Company) bool {
 	return co.HasStripe() && i.CardPayment && i.Status == StatusOpen && i.Due() > 0
 }
 
+// CardOffered reports whether the invoice's documents show online card
+// payment: an unpaid issued invoice, or a draft (its preview shows what the
+// client will receive; the link works once the invoice is issued).
+func (i *Invoice) CardOffered(co *Company) bool {
+	return co.HasStripe() && i.CardPayment && (i.Status == StatusOpen || i.Status == StatusDraft) && i.Due() > 0
+}
+
 func (s *Store) Void(companyID, id int64) error {
 	res, err := s.DB.Exec(`UPDATE invoices SET status = 'void', voided_at = ?, updated_at = ? WHERE id = ? AND company_id = ? AND status = 'open'`,
 		now(), now(), id, companyID)

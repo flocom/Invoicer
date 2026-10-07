@@ -45,6 +45,22 @@ func TestPaymentMethodsPerInvoice(t *testing.T) {
 	}
 	co, _ := e.app.Store.Company(1)
 
+	// a draft's PDF preview already shows the card payment link (QR code)
+	e.app.Store.SetSetting("base_url", "https://invoices.example.com")
+	draft := &store.Invoice{CompanyID: 1, ClientID: 1, Currency: "EUR", Lang: "en", IssueDate: today, DueDate: due, PublicToken: "drafttokendrafttokendraft",
+		CardPayment: true, Lines: []store.Line{{Description: "Work", Quantity: 1000, UnitPrice: 5000}}}
+	if err := e.app.Store.SaveDraft(draft); err != nil {
+		t.Fatal(err)
+	}
+	if in := e.app.PDFInput(co, draft); in.PayURL != "https://invoices.example.com/pay/drafttokendrafttokendraft" {
+		t.Fatalf("draft PDF pay link: %q", in.PayURL)
+	}
+	draft.CardPayment = false
+	if in := e.app.PDFInput(co, draft); in.PayURL != "" {
+		t.Fatal("pay link on a draft without card payment")
+	}
+	e.app.Store.DeleteDraft(1, draft.ID)
+
 	withCard := issue("1")
 	if !withCard.CardPayment || !withCard.CardPayable(co) {
 		t.Fatal("card payment should be offered")
