@@ -19,7 +19,6 @@ func TestCopyClientSuggestionsBankAndDestroy(t *testing.T) {
 	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
 	b.post("/companies/new", url.Values{"name": {"Beta"}, "currency": {"CHF"}, "lang": {"en"}})
 	b.post("/c/1/settings/bank/accounts", url.Values{"currency": {"EUR"}, "label": {"Main"}, "iban": {"CH9300762011623852957"}, "bic": {"POFICHBEXXX"}})
-	b.post("/c/1/settings/bank", url.Values{"email_bank_details": {"1"}})
 	b.post("/c/1/clients/new", url.Values{"name": {"Globex"}, "email": {"ap@globex.test"}, "lang": {"fr"}})
 	today := e.app.Today()
 	due := time.Now().AddDate(0, 0, 30).Format("2006-01-02")

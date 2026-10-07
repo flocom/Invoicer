@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,33 +103,36 @@ func containsAny(s string, subs ...string) bool {
 	return false
 }
 
-func TestBankEmailOptionVisible(t *testing.T) {
+// The bank account chosen on an invoice is always repeated in its e-mails;
+// there is no separate checkbox for it.
+func TestBankDetailsFollowInvoiceAccount(t *testing.T) {
 	e := newEnv(t)
+	api := newFakeAPIs(t)
 	b := setupOwner(t, e)
 	st := e.app.Store
 	b.post("/companies/new", url.Values{"name": {"Mail"}, "currency": {"EUR"}, "lang": {"en"}})
 	co, _ := st.Company(1)
 	st.UpdateCompanyEmail(1, e.app.SealResend(co, "re_test_key"), false, "Mail <billing@example.test>", "", "")
 	b.post("/c/1/clients/new", url.Values{"name": {"Client"}, "email": {"c@example.test"}, "lang": {"en"}})
-
-	// no account yet: the editor explains how to get the option
-	b.get("/c/1/invoices/new")
-	b.must("add a bank account first")
-
 	b.post("/c/1/settings/bank/accounts", url.Values{"currency": {"EUR"}, "label": {"Main"}, "iban": {"FR7630006000011234567890189"}})
-	b.get("/c/1/invoices/new")
-	b.must("Include bank transfer details (account selected above)")
 
+	b.get("/c/1/invoices/new")
+	if strings.Contains(b.last, `name="bank_present"`) || strings.Contains(b.last, "Include bank") {
+		t.Fatal("the bank details checkbox is still offered")
+	}
 	today := e.app.Today()
 	due := time.Now().AddDate(0, 0, 30).Format("2006-01-02")
-	b.post("/c/1/invoices/new", url.Values{"client_id": {"1"}, "currency": {"EUR"}, "lang": {"en"}, "issue_date": {today}, "due_date": {due},
-		"line_desc": {"Work"}, "line_qty": {"1"}, "line_price": {"100"}, "line_tax": {"0"}, "action": {"save"}})
-	b.get("/c/1/invoices/1")
-	b.must("Include bank details (Main · EUR · …0189)") // on "Issue & send"
-
-	// a currency without account explains why nothing will be included
-	b.post("/c/1/invoices/1/edit", url.Values{"client_id": {"1"}, "currency": {"USD"}, "lang": {"en"}, "issue_date": {today}, "due_date": {due},
-		"line_desc": {"Work"}, "line_qty": {"1"}, "line_price": {"100"}, "line_tax": {"0"}, "action": {"save"}})
-	b.get("/c/1/invoices/1")
-	b.must("no account in this invoice")
+	send := func(bank string) string {
+		b.post("/c/1/invoices/new", url.Values{"client_id": {"1"}, "currency": {"EUR"}, "lang": {"en"}, "issue_date": {today}, "due_date": {due},
+			"line_desc": {"Work"}, "line_qty": {"1"}, "line_price": {"100"}, "line_tax": {"0"}, "bank_account": {bank}, "action": {"send"}})
+		api.mu.Lock()
+		defer api.mu.Unlock()
+		return fmt.Sprint(api.mails[len(api.mails)-1]["text"])
+	}
+	if text := send("auto"); !strings.Contains(text, "FR76 3000 6000 0112 3456 7890 189") {
+		t.Fatalf("bank details missing from the e-mail:\n%s", text)
+	}
+	if text := send("none"); strings.Contains(text, "FR76") {
+		t.Fatalf("bank details in the e-mail although none is chosen:\n%s", text)
+	}
 }

@@ -23,7 +23,6 @@
       <div class="draft-callout-text"><strong>{{.T "invoice.draft_title"}}</strong><p>{{.T "invoice.draft_body"}}</p></div>
       <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="draft-actions">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <div class="draft-bank">{{if $d.CanSend}}{{template "bankmail" (dict "P" $ "Bank" $d.Bank)}}{{end}}</div>
         <div class="row">
           <button class="btn" type="submit" formaction="{{.CPath "/invoices/%d/issue" $inv.ID}}" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.issue"}}</button>
           {{if $d.CanSend}}<button class="btn btn-primary" type="submit" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.issue_send"}}</button>{{end}}
@@ -137,7 +136,6 @@
         <form method="post" action="{{.CPath "/invoices/%d/send" $inv.ID}}" class="stack">
           <input type="hidden" name="csrf" value="{{.CSRF}}">
           <textarea name="message" rows="3" maxlength="2000" placeholder="{{.T "invoice.message_ph"}}"></textarea>
-          {{template "bankmail" (dict "P" $ "Bank" $d.Bank)}}
           <button class="btn btn-primary" type="submit">{{template "icon" "send"}}{{.T "action.send"}}</button>
         </form>
       </details>

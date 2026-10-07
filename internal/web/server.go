@@ -194,7 +194,6 @@ func (s *Server) Handler() http.Handler {
 	ca("POST /c/{cid}/settings/general", s.companySaveGeneral)
 	ca("POST /c/{cid}/settings/logo", s.companySaveLogo)
 	ca("POST /c/{cid}/settings/invoicing", s.companySaveInvoicing)
-	ca("POST /c/{cid}/settings/bank", s.companySaveBank)
 	ca("POST /c/{cid}/settings/bank/accounts", s.bankCreate)
 	ca("POST /c/{cid}/settings/bank/accounts/{bid}", s.bankUpdate)
 	ca("POST /c/{cid}/settings/bank/accounts/{bid}/delete", s.bankDelete)

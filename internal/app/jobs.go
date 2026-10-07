@@ -221,7 +221,7 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 	if send {
 		// only e-mail invoices generated for today, not catch-up backlog older than a week
 		if issue >= addDays(today, -7) {
-			if err := a.SendInvoiceEmail(ctx, co, issued, "invoice", "", 0, "recurring-"+issued.PublicToken, nil); err != nil {
+			if err := a.SendInvoiceEmail(ctx, co, issued, "invoice", "", 0, "recurring-"+issued.PublicToken); err != nil {
 				a.Store.SetRecurringError(r.ID, "e-mail: "+err.Error())
 			}
 		}
@@ -305,7 +305,7 @@ func (a *App) RunReminders(ctx context.Context) {
 			} else if best == 0 {
 				kind = "reminder_due"
 			}
-			err := a.SendInvoiceEmail(ctx, co, inv, kind, "", 0, "reminder-"+inv.PublicToken+"-"+strconv.Itoa(best), nil)
+			err := a.SendInvoiceEmail(ctx, co, inv, kind, "", 0, "reminder-"+inv.PublicToken+"-"+strconv.Itoa(best))
 			if err != nil {
 				slog.Warn("reminder failed", "invoice", inv.ID, "err", err)
 				continue

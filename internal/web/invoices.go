@@ -368,15 +368,6 @@ func (s *Server) invoiceSetBank(c *Ctx) error {
 	return c.redirect(c.cpath("/invoices/%d", inv.ID))
 }
 
-// sendBank reads the "include bank details" checkbox of a send form.
-func sendBank(c *Ctx) *bool {
-	if c.R.PostForm.Get("bank_present") == "" {
-		return nil // form without the checkbox: company default
-	}
-	v := c.form("bank") == "1"
-	return &v
-}
-
 func (s *Server) doSend(c *Ctx, id int64, message string) error {
 	inv, err := s.Store.Invoice(c.Company.ID, id)
 	if err != nil {
@@ -388,7 +379,7 @@ func (s *Server) doSend(c *Ctx, id int64, message string) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, "", sendBank(c)); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, "invoice", message, c.User.ID, ""); err != nil {
 		if errors.Is(err, app.ErrNoEmail) {
 			c.bad("err.no_email_config")
 		} else if errors.Is(err, app.ErrNoRecipient) {
@@ -426,7 +417,7 @@ func (s *Server) invoiceRemind(c *Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(c.R.Context(), 45*time.Second)
 	defer cancel()
-	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, "", sendBank(c)); err != nil {
+	if err := s.App.SendInvoiceEmail(ctx, c.Company, inv, kind, clip(c.form("message"), 2000), c.User.ID, ""); err != nil {
 		c.flash("err", err.Error())
 	} else {
 		c.audit("invoice.reminder", inv.Number)
