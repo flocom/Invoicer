@@ -512,9 +512,6 @@ body.bare { background: radial-gradient(1100px 520px at 50% -140px, #e6e8ff 0%, 
 .draft-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: .75rem 1rem; flex-wrap: wrap;
   padding-top: 1rem; border-top: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border)); }
 .draft-actions .row { margin-left: auto; flex-wrap: wrap; }
-.draft-bank { min-width: 0; flex: 1 1 260px; }
-.draft-bank .check { font-size: .84rem; font-weight: 500; color: var(--text-2); align-items: flex-start; }
-.draft-bank .check input { margin-top: .15rem; }
 @media (max-width: 760px) {
   .draft-actions .row { margin-left: 0; width: 100%; }
   .draft-actions .row > .btn { flex: 1; }

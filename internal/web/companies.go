@@ -248,16 +248,6 @@ func (s *Server) companySaveInvoicing(c *Ctx) error {
 	return c.redirect(c.cpath("/settings?tab=invoicing"))
 }
 
-// companySaveBank stores the "bank details in e-mails" default.
-func (s *Server) companySaveBank(c *Ctx) error {
-	if err := s.Store.SetEmailBankDetails(c.Company.ID, c.form("email_bank_details") == "1"); err != nil {
-		return err
-	}
-	c.audit("company.settings", "bank e-mail option")
-	c.ok("flash.saved")
-	return c.redirect(c.cpath("/settings?tab=payments#banks"))
-}
-
 // bankFromForm validates a bank account form.
 func bankFromForm(c *Ctx, b *store.BankAccount) string {
 	b.Label = clip(c.form("label"), 80)

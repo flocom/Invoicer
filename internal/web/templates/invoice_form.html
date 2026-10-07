@@ -43,7 +43,6 @@
       <div class="menu-panel stack small">
         <p class="small"><strong>{{.T "invoice.ask_send"}}</strong></p>
         <button class="btn btn-primary btn-block" type="submit" name="action" value="send" data-confirm="{{.T "invoice.send_confirm"}}">{{template "icon" "send"}}{{.T "invoice.issue_and_send"}}</button>
-        {{template "bankmail" (dict "P" $ "Any" $d.Banks)}}
         <button class="btn btn-block" type="submit" name="action" value="issue" data-confirm="{{.T "invoice.issue_confirm"}}">{{.T "invoice.issue_no_send"}}</button>
       </div>
     </details>

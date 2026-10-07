@@ -188,8 +188,7 @@ var ErrNoRecipient = errors.New("the client has no e-mail address")
 // SendInvoiceEmail sends the invoice (kind "invoice") or a reminder
 // ("reminder_before", "reminder_due", "reminder_overdue") with the PDF
 // attached. Drafts are issued first.
-// bank overrides the company's "bank details in e-mails" option (nil = default).
-func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *store.Invoice, kind, message string, userID int64, idemKey string, bank *bool) error {
+func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *store.Invoice, kind, message string, userID int64, idemKey string) error {
 	if !co.HasResend() {
 		return ErrNoEmail
 	}
@@ -226,11 +225,8 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 	if inv.Status == store.StatusPaid {
 		c.Amount = money.Format(inv.Total, inv.Currency, lang)
 	}
-	withBank := co.EmailBankDetails
-	if bank != nil {
-		withBank = *bank
-	}
-	if withBank && inv.Status == store.StatusOpen && inv.Due() > 0 {
+	// the bank account chosen on the invoice (if any) is repeated in the e-mail
+	if inv.Status == store.StatusOpen && inv.Due() > 0 {
 		c.Bank = BankLines(a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency), co, inv, lang)
 	}
 	subject, html, text := mailer.Render(c)
