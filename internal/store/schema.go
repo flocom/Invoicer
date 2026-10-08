@@ -387,4 +387,8 @@ CREATE TABLE stripe_log (
 CREATE INDEX stripe_log_company ON stripe_log(company_id, id);
 CREATE INDEX stripe_log_invoice ON stripe_log(invoice_id);
 `,
+	// 11 — language of the invoices of a schedule ('' = the client's)
+	`
+ALTER TABLE recurring ADD COLUMN lang TEXT NOT NULL DEFAULT '';
+`,
 }

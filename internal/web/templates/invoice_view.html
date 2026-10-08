@@ -182,6 +182,7 @@
 
     <div class="card stack small action-list">
       <h3>{{.T "invoice.more"}}</h3>
+      {{if and (ne $inv.Status "void") (not $inv.RecurringID)}}<a class="btn btn-ghost btn-sm btn-block" href="{{.CPath "/recurring/new"}}?from={{$inv.ID}}">{{template "icon" "repeat"}}{{.T "invoice.make_recurring"}}</a>{{end}}
       <form method="post" action="{{.CPath "/invoices/%d/duplicate" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-ghost btn-sm btn-block" type="submit">{{template "icon" "copy"}}{{.T "invoice.duplicate"}}</button></form>
       {{if eq $inv.Status "open"}}<form method="post" action="{{.CPath "/invoices/%d/void" $inv.ID}}" data-confirm="{{.T "invoice.void_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{.T "invoice.void"}}</button></form>{{end}}
       {{if eq $inv.Status "draft"}}<form method="post" action="{{.CPath "/invoices/%d/delete" $inv.ID}}" data-confirm="{{.T "invoice.delete_confirm"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-danger-ghost btn-sm btn-block" type="submit">{{template "icon" "trash"}}{{.T "invoice.delete"}}</button></form>

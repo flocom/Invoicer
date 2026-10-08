@@ -252,6 +252,8 @@ select, input[role=combobox] { appearance: none; background-image: linear-gradie
 .banner-warn { background: var(--warn-soft); color: var(--warn); }
 .note { display: flex; gap: .55rem; align-items: flex-start; padding: .7rem .85rem; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .86rem; color: var(--text-2); }
 .note.warn { background: var(--warn-soft); color: var(--warn); }
+.note.info { background: var(--primary-soft); color: var(--primary-hover); align-items: center; }
+.note.info .icon { flex: none; }
 .note.ok { background: var(--ok-soft); color: var(--ok); flex-direction: column; }
 .status-line { display: flex; align-items: center; gap: .45rem; font-weight: 550; }
 .status-line.ok { color: var(--ok); }

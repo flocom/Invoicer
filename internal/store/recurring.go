@@ -26,8 +26,9 @@ type Recurring struct {
 	LastError     string
 	BankAccountID int64
 	CardPayment   bool
-	AutoCharge    bool // charge the client's saved card on each generated invoice
-	Generated     int  // invoices generated so far
+	AutoCharge    bool   // charge the client's saved card on each generated invoice
+	Generated     int    // invoices generated so far
+	Lang          string // language of the invoices; "" = the client's
 	CreatedAt     int64
 
 	Lines      []Line
@@ -71,12 +72,12 @@ func (r *Recurring) Advance(from string) string {
 }
 
 const recurringCols = `r.id, r.company_id, r.client_id, r.name, r.currency, r.interval_unit, r.interval_count, r.anchor_day, r.next_run,
-	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment, r.auto_charge, r.generated`
+	r.end_date, r.remaining, r.due_days, r.auto_send, r.active, r.notes, r.last_run_at, r.last_error, r.created_at, c.name, r.bank_account_id, r.card_payment, r.auto_charge, r.generated, r.lang`
 
 func scanRecurring(row interface{ Scan(...any) error }) (*Recurring, error) {
 	r := &Recurring{}
 	err := row.Scan(&r.ID, &r.CompanyID, &r.ClientID, &r.Name, &r.Currency, &r.IntervalUnit, &r.IntervalCount, &r.AnchorDay,
-		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment, &r.AutoCharge, &r.Generated)
+		&r.NextRun, &r.EndDate, &r.Remaining, &r.DueDays, &r.AutoSend, &r.Active, &r.Notes, &r.LastRunAt, &r.LastError, &r.CreatedAt, &r.ClientName, &r.BankAccountID, &r.CardPayment, &r.AutoCharge, &r.Generated, &r.Lang)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -164,18 +165,18 @@ func (s *Store) SaveRecurring(r *Recurring) error {
 	return withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
 		if r.ID == 0 {
 			res, err := tx.Exec(`INSERT INTO recurring(company_id, client_id, name, currency, interval_unit, interval_count, anchor_day,
-				next_run, end_date, remaining, due_days, auto_send, active, notes, bank_account_id, card_payment, auto_charge, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				next_run, end_date, remaining, due_days, auto_send, active, notes, bank_account_id, card_payment, auto_charge, lang, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				r.CompanyID, r.ClientID, r.Name, r.Currency, r.IntervalUnit, r.IntervalCount, r.AnchorDay, r.NextRun, r.EndDate,
-				r.Remaining, r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), now())
+				r.Remaining, r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), r.Lang, now())
 			if err != nil {
 				return err
 			}
 			r.ID, _ = res.LastInsertId()
 		} else {
 			_, err := tx.Exec(`UPDATE recurring SET client_id=?, name=?, currency=?, interval_unit=?, interval_count=?, anchor_day=?,
-				next_run=?, end_date=?, remaining=?, due_days=?, auto_send=?, active=?, notes=?, bank_account_id=?, card_payment=?, auto_charge=? WHERE id=? AND company_id=?`,
+				next_run=?, end_date=?, remaining=?, due_days=?, auto_send=?, active=?, notes=?, bank_account_id=?, card_payment=?, auto_charge=?, lang=? WHERE id=? AND company_id=?`,
 				r.ClientID, r.Name, r.Currency, r.IntervalUnit, r.IntervalCount, r.AnchorDay, r.NextRun, r.EndDate, r.Remaining,
-				r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), r.ID, r.CompanyID)
+				r.DueDays, b2i(r.AutoSend), b2i(r.Active), r.Notes, r.BankAccountID, b2i(r.CardPayment), b2i(r.AutoCharge), r.Lang, r.ID, r.CompanyID)
 			if err != nil {
 				return err
 			}
@@ -225,8 +226,27 @@ func (s *Store) SetRecurringActive(companyID, id int64, active bool) error {
 	return err
 }
 
+// DeleteRecurring removes a schedule; its invoices stay, detached (SQLite
+// may give the same id to the next schedule).
 func (s *Store) DeleteRecurring(companyID, id int64) error {
-	_, err := s.DB.Exec(`DELETE FROM recurring WHERE id = ? AND company_id = ?`, id, companyID)
+	return withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
+		res, err := tx.Exec(`DELETE FROM recurring WHERE id = ? AND company_id = ?`, id, companyID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil
+		}
+		_, err = tx.Exec(`UPDATE invoices SET recurring_id = 0 WHERE recurring_id = ? AND company_id = ?`, id, companyID)
+		return err
+	})
+}
+
+// AttachToRecurring makes an invoice the first one of a schedule created
+// from it (unless it already belongs to one).
+func (s *Store) AttachToRecurring(companyID, invoiceID, recurringID int64) error {
+	_, err := s.DB.Exec(`UPDATE invoices SET recurring_id = ? WHERE id = ? AND company_id = ? AND recurring_id = 0 AND status != 'void'
+		AND EXISTS (SELECT 1 FROM recurring WHERE id = ? AND company_id = ?)`, recurringID, invoiceID, companyID, recurringID, companyID)
 	return err
 }
 
