@@ -3,6 +3,7 @@
 <div class="page-head">
   <div><h1>{{.T "nav.invoices"}}</h1></div>
   <div class="actions"><a class="btn" href="{{.CPath "/emails"}}">{{template "icon" "send"}}{{.T "emails.title"}}</a>
+    <a class="btn" href="{{.CPath "/stripe-log"}}">{{template "icon" "card"}}{{.T "stripelog.title"}}</a>
     <a class="btn btn-primary" href="{{.CPath "/invoices/new"}}">{{template "icon" "plus"}}{{.T "invoice.new"}}</a></div>
 </div>
 <div class="toolbar">

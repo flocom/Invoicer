@@ -368,4 +368,23 @@ UPDATE email_log SET invoice_id = 0 WHERE invoice_id != 0 AND NOT EXISTS (
 	SELECT 1 FROM invoices i WHERE i.id = email_log.invoice_id AND i.company_id = email_log.company_id
 	AND i.created_at <= email_log.created_at);
 `,
+	// 10 — what happened on Stripe (payment links, payments, charges, webhooks)
+	`
+CREATE TABLE stripe_log (
+	id         INTEGER PRIMARY KEY,
+	company_id INTEGER NOT NULL,
+	invoice_id INTEGER NOT NULL DEFAULT 0,
+	client_id  INTEGER NOT NULL DEFAULT 0,
+	number     TEXT NOT NULL DEFAULT '',
+	event      TEXT NOT NULL,
+	level      TEXT NOT NULL DEFAULT 'info',
+	ref        TEXT NOT NULL DEFAULT '',
+	amount     INTEGER NOT NULL DEFAULT 0,
+	currency   TEXT NOT NULL DEFAULT '',
+	detail     TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX stripe_log_company ON stripe_log(company_id, id);
+CREATE INDEX stripe_log_invoice ON stripe_log(invoice_id);
+`,
 }

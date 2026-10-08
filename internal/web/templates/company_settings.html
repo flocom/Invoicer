@@ -119,6 +119,7 @@
     <form method="post" action="{{.CPath "/settings/email/test"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">{{template "icon" "send"}}{{.T "settings.send_test" .User.Email}}</button></form>
     {{else}}<p class="status-line off">{{template "icon" "x"}}{{.T "settings.email_not_ready"}}</p>{{end}}
     <p class="hint">{{.T "settings.bank_in_emails"}} <a href="?tab=payments#banks">{{.T "settings.tab_payments"}}</a></p>
+    <p class="hint">{{template "icon" "bell"}} {{if $d.NotifyTo}}{{.T "settings.notify_to" $d.NotifyTo}}{{else}}{{.T "settings.notify_none"}} <a href="?tab=general">{{.T "settings.tab_general"}}</a>{{end}}</p>
   </div>
   <div class="card stack small">
     <h3>{{.T "settings.how_to"}}</h3>

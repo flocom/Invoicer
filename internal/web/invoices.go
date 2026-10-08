@@ -285,6 +285,7 @@ func (s *Server) invoiceView(c *Ctx) error {
 	}
 	banks, _ := s.Store.BankAccounts(c.Company.ID)
 	charges, _ := s.Store.InvoiceCharges(inv.ID)
+	stripeLog, _ := s.Store.InvoiceStripeLog(c.Company.ID, inv.ID)
 	var cards []*store.SavedCard
 	if c.Company.HasStripe() && inv.Status == store.StatusOpen && inv.Due() > 0 {
 		cards, _ = s.Store.Cards(c.Company.ID, inv.ClientID)
@@ -294,6 +295,7 @@ func (s *Server) invoiceView(c *Ctx) error {
 		"Invoice": inv, "Client": cl, "Buyer": buyer, "Payments": payments, "Emails": emails,
 		"TaxGroups": store.TaxGroups(inv.Lines), "PublicURL": s.App.PublicURL(inv), "CanSend": c.Company.HasResend(),
 		"HasStripe": c.Company.HasStripe() && inv.CardPayment, "Charges": charges, "Cards": cards,
+		"StripeLog": stripeLog,
 	}))
 }
 

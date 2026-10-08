@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"github.com/flocom/invoicer/internal/app"
 	"github.com/flocom/invoicer/internal/brand"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/mailer"
@@ -91,6 +92,7 @@ type settingsData struct {
 	Members       map[int64]bool
 	Reminders     string
 	Banks         []*store.BankAccount
+	NotifyTo      string // where payment notifications go
 }
 
 func (s *Server) companySettings(c *Ctx) error {
@@ -102,7 +104,8 @@ func (s *Server) companySettings(c *Ctx) error {
 	}
 	d := &settingsData{Tab: tab, ResendKeySet: len(c.Company.ResendKey) > 0, StripeKeySet: c.Company.HasStripe(),
 		WebhookActive: c.Company.StripeWebhookID != "", WebhookURL: s.App.BaseURL() + "/webhooks/stripe/" + c.Company.PublicID,
-		PublicHTTPS: s.App.IsPublicHTTPS(), Reminders: c.Company.ReminderDays}
+		PublicHTTPS: s.App.IsPublicHTTPS(), Reminders: c.Company.ReminderDays,
+		NotifyTo: app.OwnerAddress(c.Company)}
 	if tab == "payments" {
 		d.Banks, _ = s.Store.BankAccounts(c.Company.ID)
 	}

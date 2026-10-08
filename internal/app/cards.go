@@ -69,6 +69,7 @@ func (a *App) CardSetupCheckout(ctx context.Context, co *store.Company, sc *stor
 	if err := a.Store.SaveCardSetup(s.ID, co.ID, sc.ClientID, s.ExpiresAt); err != nil {
 		return "", err
 	}
+	a.logStripe(co, nil, store.StripeLog{ClientID: sc.ClientID, Event: "card.setup_started", Ref: s.ID})
 	return s.URL, nil
 }
 
@@ -104,6 +105,7 @@ func (a *App) saveCard(co *store.Company, clientID int64, c *stripe.Card) error 
 		return err
 	}
 	a.Store.Audit(0, co.ID, "", "card.saved", fmt.Sprintf("client %d: %s", clientID, sc.Label()))
+	a.logStripe(co, nil, store.StripeLog{ClientID: clientID, Event: "card.saved", Level: "ok", Ref: c.ID, Detail: sc.Label()})
 	return nil
 }
 
@@ -176,6 +178,7 @@ func (a *App) ChargeInvoice(ctx context.Context, co *store.Company, inv *store.I
 		}
 		a.Store.UpdateCharge(ch.ID, piID, "failed", msg)
 		ch.Status, ch.Error = "failed", msg
+		a.logStripe(co, inv, store.StripeLog{Event: "charge.failed", Level: "error", Ref: piID, Amount: ch.Amount, Detail: ch.CardLabel + " — " + msg})
 		a.Store.Audit(userID, co.ID, "", "card.charge_failed", fmt.Sprintf("%s %s: %s", inv.Number, money.Format(ch.Amount, inv.Currency, "en"), msg))
 		return ch, fmt.Errorf("%w: %s", ErrChargeFailed, msg)
 	}
@@ -187,10 +190,13 @@ func (a *App) applyCharge(ctx context.Context, co *store.Company, inv *store.Inv
 	switch pi.Status {
 	case "succeeded":
 		a.Store.UpdateCharge(ch.ID, pi.ID, "succeeded", "")
+		a.logStripe(co, inv, store.StripeLog{Event: "charge.succeeded", Level: "ok", Ref: pi.ID, Amount: ch.Amount, Detail: ch.CardLabel})
+		err := a.recordCardPayment(ctx, co, inv, ch, pi)
 		ch.Status = "succeeded"
-		return a.recordCardPayment(ctx, co, inv, pi)
+		return err
 	case "processing":
 		a.Store.UpdateCharge(ch.ID, pi.ID, "processing", "")
+		a.logStripe(co, inv, store.StripeLog{Event: "charge.processing", Ref: pi.ID, Amount: ch.Amount, Detail: ch.CardLabel})
 		ch.Status = "processing"
 		return nil
 	default: // requires_action (3-D Secure), requires_payment_method, canceled
@@ -200,11 +206,15 @@ func (a *App) applyCharge(ctx context.Context, co *store.Company, inv *store.Inv
 		}
 		a.Store.UpdateCharge(ch.ID, pi.ID, "failed", msg)
 		ch.Status, ch.Error = "failed", msg
+		a.logStripe(co, inv, store.StripeLog{Event: "charge.failed", Level: "error", Ref: pi.ID, Amount: ch.Amount, Detail: ch.CardLabel + " — " + msg})
 		return fmt.Errorf("%w: %s", ErrChargeFailed, msg)
 	}
 }
 
-func (a *App) recordCardPayment(ctx context.Context, co *store.Company, inv *store.Invoice, pi *stripe.PaymentIntent) error {
+// recordCardPayment records a successful charge. The owner is notified of
+// automatic charges and of those that completed later; a charge made from
+// the interface shows its outcome on screen.
+func (a *App) recordCardPayment(ctx context.Context, co *store.Company, inv *store.Invoice, ch *store.CardCharge, pi *stripe.PaymentIntent) error {
 	if !strings.EqualFold(pi.Currency, inv.Currency) {
 		a.Store.Audit(0, co.ID, "", "payment.stripe_currency_mismatch", pi.ID)
 		return nil
@@ -213,9 +223,9 @@ func (a *App) recordCardPayment(ctx context.Context, co *store.Company, inv *sto
 	if amount == 0 {
 		amount = pi.Amount
 	}
-	becamePaid, err := a.Store.RecordPayment(inv.ID, store.Payment{Amount: amount, Method: "stripe", Reference: pi.ID, PaidOn: a.Today(),
-		StripeSessionID: pi.ID}, 0)
-	if err != nil {
+	recorded, becamePaid, err := a.Store.RecordPaymentOnce(inv.ID, store.Payment{Amount: amount, Method: "stripe", Reference: pi.ID,
+		PaidOn: a.Today(), StripeSessionID: pi.ID}, 0)
+	if err != nil || !recorded {
 		return err
 	}
 	a.ExpireSessions(ctx, co, inv.ID, "")
@@ -224,6 +234,9 @@ func (a *App) recordCardPayment(ctx context.Context, co *store.Company, inv *sto
 		if inv, err := a.Store.Invoice(co.ID, inv.ID); err == nil {
 			a.SendReceipt(ctx, co, inv)
 		}
+	}
+	if ch.Automatic || ch.Status == "processing" {
+		a.notifyOwner(ctx, co, inv, ownerNote{Kind: "owner_paid", Amount: amount, Card: ch.CardLabel, IdempotencyKey: "owner-paid-" + pi.ID})
 	}
 	return nil
 }
@@ -246,7 +259,7 @@ func (a *App) ReconcileCards(ctx context.Context) {
 				continue
 			}
 			if err := a.applyCharge(ctx, co, inv, ch, pi); errors.Is(err, ErrChargeFailed) && ch.Automatic {
-				a.SendChargeFailedEmail(ctx, co, inv, ch)
+				a.chargeFailed(ctx, co, inv, ch)
 			}
 		}
 	}
@@ -281,7 +294,17 @@ func (a *App) autoCharge(ctx context.Context, co *store.Company, r *store.Recurr
 	if ch == nil {
 		return false
 	}
-	return a.SendChargeFailedEmail(ctx, co, inv, ch) == nil
+	return a.chargeFailed(ctx, co, inv, ch)
+}
+
+// chargeFailed handles a declined automatic charge: the client gets a link to
+// update their card and pay, the owner a notification. It reports whether the
+// client was told.
+func (a *App) chargeFailed(ctx context.Context, co *store.Company, inv *store.Invoice, ch *store.CardCharge) bool {
+	told := a.SendChargeFailedEmail(ctx, co, inv, ch) == nil
+	a.notifyOwner(ctx, co, inv, ownerNote{Kind: "owner_charge_failed", Amount: ch.Amount, Card: ch.CardLabel, Reason: ch.Error,
+		ClientNotified: told, IdempotencyKey: fmt.Sprintf("owner-failed-%d", ch.ID)})
+	return told
 }
 
 // SendChargeFailedEmail tells the client an automatic card payment failed,

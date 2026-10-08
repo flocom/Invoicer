@@ -109,23 +109,33 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid signature", http.StatusBadRequest)
 		return
 	}
+	var obj struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(ev.Data.Object, &obj)
+	entry := store.StripeLog{CompanyID: co.ID, Event: "webhook", Ref: ev.ID, Detail: ev.Type}
+	if ss, err := s.Store.StripeSession(obj.ID); err == nil {
+		entry.InvoiceID = ss.InvoiceID
+		if inv, err := s.Store.Invoice(co.ID, ss.InvoiceID); err == nil {
+			entry.ClientID, entry.Number = inv.ClientID, inv.Number
+		}
+	} else if cs, err := s.Store.CardSetup(obj.ID); err == nil && cs.CompanyID == co.ID {
+		entry.ClientID = cs.ClientID
+	}
+	s.Store.LogStripe(entry)
 	switch ev.Type {
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.expired":
-		var obj struct {
-			ID string `json:"id"`
-		}
-		json.Unmarshal(ev.Data.Object, &obj)
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		sess, err := stripe.GetCheckout(ctx, s.App.StripeKey(co), obj.ID)
-		if err != nil {
-			slog.Error("stripe webhook fetch", "err", err)
-			http.Error(w, "retry", http.StatusServiceUnavailable)
-			return
+		if err == nil {
+			err = s.App.ApplyStripeSession(ctx, co, sess)
 		}
-		if err := s.App.ApplyStripeSession(ctx, co, sess); err != nil {
-			slog.Error("stripe webhook apply", "err", err)
-			http.Error(w, "retry", http.StatusInternalServerError)
+		if err != nil {
+			slog.Error("stripe webhook", "type", ev.Type, "err", err)
+			entry.Event, entry.Level, entry.Detail = "webhook.failed", "error", ev.Type+" — "+err.Error()
+			s.Store.LogStripe(entry)
+			http.Error(w, "retry", http.StatusServiceUnavailable)
 			return
 		}
 	}

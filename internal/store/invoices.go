@@ -454,6 +454,9 @@ func (s *Store) deleteInvoice(companyID, id int64, draftOnly bool) error {
 			}
 			return ErrNotFound
 		}
+		if _, err = tx.Exec(`UPDATE stripe_log SET invoice_id = 0 WHERE invoice_id = ? AND company_id = ?`, id, companyID); err != nil {
+			return err
+		}
 		_, err = tx.Exec(`UPDATE email_log SET invoice_id = 0 WHERE invoice_id = ? AND company_id = ?`, id, companyID)
 		return err
 	})
@@ -478,8 +481,15 @@ var PaymentMethods = []string{"bank_transfer", "stripe", "card", "cash", "check"
 // (true, nil) when the invoice became fully paid with this payment. A
 // duplicate Stripe session is silently ignored (idempotent webhooks).
 func (s *Store) RecordPayment(invoiceID int64, p Payment, by int64) (bool, error) {
-	becamePaid := false
-	err := withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
+	_, becamePaid, err := s.RecordPaymentOnce(invoiceID, p, by)
+	return becamePaid, err
+}
+
+// RecordPaymentOnce is RecordPayment that also reports whether the payment
+// was recorded now (false when its Stripe session or payment intent already
+// was, e.g. by the webhook and the return page at the same time).
+func (s *Store) RecordPaymentOnce(invoiceID int64, p Payment, by int64) (recorded, becamePaid bool, err error) {
+	err = withTx(context.Background(), s.DB, func(tx *sql.Tx) error {
 		var status string
 		var total, paid int64
 		if err := tx.QueryRow(`SELECT status, total, amount_paid FROM invoices WHERE id = ?`, invoiceID).Scan(&status, &total, &paid); err != nil {
@@ -497,6 +507,7 @@ func (s *Store) RecordPayment(invoiceID int64, p Payment, by int64) (bool, error
 				return nil
 			}
 		}
+		recorded = true
 		if _, err := tx.Exec(`INSERT INTO payments(invoice_id, amount, method, reference, paid_on, stripe_session_id, created_by, created_at)
 			VALUES(?,?,?,?,?,?,?,?)`, invoiceID, p.Amount, p.Method, p.Reference, p.PaidOn, sid, by, now()); err != nil {
 			return err
@@ -511,7 +522,10 @@ func (s *Store) RecordPayment(invoiceID int64, p Payment, by int64) (bool, error
 			updated_at = ? WHERE id = ?`, paid, newStatus, newStatus, paidAt, now(), invoiceID)
 		return err
 	})
-	return becamePaid, err
+	if err != nil {
+		return false, false, err
+	}
+	return recorded, becamePaid, nil
 }
 
 func (s *Store) DeletePayment(invoiceID, paymentID int64) error {

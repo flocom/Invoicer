@@ -161,6 +161,7 @@ func (s *Server) Handler() http.Handler {
 	c("GET /c/{cid}/emails", s.emailList)
 	c("GET /c/{cid}/emails/{id}", s.emailView)
 	c("GET /c/{cid}/emails/{id}/html", s.emailHTML)
+	c("GET /c/{cid}/stripe-log", s.stripeLogList)
 	c("GET /c/{cid}/invoices/new", s.invoiceForm)
 	c("POST /c/{cid}/invoices/new", s.invoiceSave)
 	c("GET /c/{cid}/invoices/{id}", s.invoiceView)

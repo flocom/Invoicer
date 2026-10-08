@@ -1,0 +1,35 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head">
+  <div><a class="back" href="{{.CPath "/invoices"}}">← {{.T "nav.invoices"}}</a><h1>{{.T "stripelog.title"}}</h1><p class="muted">{{.T "stripelog.intro"}}</p></div>
+  <div class="actions"><a class="btn" href="{{.CPath "/emails"}}">{{template "icon" "send"}}{{.T "emails.title"}}</a></div>
+</div>
+{{if $d.Entries}}
+<div class="card flush">
+  <div class="table-wrap">
+  <table class="table small log-table">
+    <thead><tr><th>{{.T "emails.date"}}</th><th>{{.T "stripelog.event"}}</th><th>{{.T "card.invoice"}}</th><th class="r">{{.T "stripelog.amount"}}</th><th>{{.T "stripelog.details"}}</th><th>{{.T "stripelog.ref"}}</th></tr></thead>
+    <tbody>
+    {{range $d.Entries}}
+    <tr>
+      <td class="nowrap muted">{{$.DateTime .CreatedAt}}</td>
+      <td class="nowrap"><span class="log-dot log-{{.Level}}"></span>{{$.TS "stripelog." .Event}}</td>
+      <td class="mono nowrap">{{if and .InvoiceID .Number}}<a href="{{$.CPath "/invoices/%d" .InvoiceID}}">{{.Number}}</a>{{else if .Number}}{{.Number}}{{else if .ClientID}}<a href="{{$.CPath "/clients/%d" .ClientID}}">{{$.T "stripelog.client"}}</a>{{else}}<span class="muted">–</span>{{end}}</td>
+      <td class="r nowrap">{{if .Amount}}{{$.Money .Amount .Currency}}{{end}}</td>
+      <td class="log-detail">{{.Detail}}</td>
+      <td class="mono muted log-ref">{{.Ref}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</div>
+<div class="pager">
+  {{if gt $d.Page 1}}<a class="btn btn-sm" href="?page={{add $d.Page -1}}">← {{.T "action.previous"}}</a>{{end}}
+  <span class="muted small">{{.T "stripelog.count" $d.Total}}</span>
+  {{if $d.HasNext}}<a class="btn btn-sm" href="?page={{add $d.Page 1}}">{{.T "action.next"}} →</a>{{end}}
+</div>
+{{else}}
+<div class="empty big">{{template "icon" "card"}}<h2>{{.T "stripelog.empty"}}</h2>{{if not $d.HasStripe}}<p class="muted">{{.T "stripelog.no_stripe"}}</p>{{end}}</div>
+{{end}}
+{{end}}
