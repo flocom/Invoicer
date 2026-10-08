@@ -3,10 +3,13 @@ package web
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/flocom/invoicer/internal/app"
+	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/money"
 	"github.com/flocom/invoicer/internal/store"
 )
@@ -30,6 +33,7 @@ type recurringFormData struct {
 	Card     *store.SavedCard // default card charged by "generate now", when automatic charging applies
 	Cards    map[int64]string // client id → default card, to offer charging it when saving a schedule due today
 	Today    string
+	From     *store.Invoice // invoice the new schedule is made from
 }
 
 // formData completes what every rendering of the schedule form needs.
@@ -87,6 +91,12 @@ func (s *Server) recurringForm(c *Ctx) error {
 				}
 			}
 		}
+		if fid, _ := strconv.ParseInt(c.R.URL.Query().Get("from"), 10, 64); fid != 0 {
+			if inv, err := s.Store.Invoice(co.ID, fid); err == nil && inv.Status != store.StatusVoid {
+				d.From = inv
+				s.recurringFromInvoice(d.R, inv, today)
+			}
+		}
 		d.IsNew = true
 	}
 	d.Preview = previewRuns(d.R, 4)
@@ -95,6 +105,44 @@ func (s *Server) recurringForm(c *Ctx) error {
 		title = d.R.Name
 	}
 	return s.render(c, 200, "recurring_form", s.page(c, title, "recurring", s.recurringFormExtras(c, d)))
+}
+
+// recurringFromInvoice fills a new schedule with the content of an invoice:
+// same client, lines, currency, language, payment terms and methods; it
+// starts one month after the invoice (the invoice is the first period).
+func (s *Server) recurringFromInvoice(r *store.Recurring, inv *store.Invoice, today string) {
+	r.ClientID, r.Currency, r.Lang, r.Notes = inv.ClientID, inv.Currency, inv.Lang, inv.Notes
+	r.BankAccountID, r.CardPayment = inv.BankAccountID, inv.CardPayment
+	r.Lines = nil
+	for _, l := range inv.Lines {
+		r.Lines = append(r.Lines, store.Line{Description: l.Description, Quantity: l.Quantity, UnitPrice: l.UnitPrice, TaxBP: l.TaxBP})
+	}
+	if len(r.Lines) == 0 {
+		r.Lines = []store.Line{{Quantity: 1000}}
+	}
+	if len(inv.Lines) > 0 {
+		r.Name = clip(firstLine(inv.Lines[0].Description), 200)
+	}
+	issue, err1 := time.Parse("2006-01-02", inv.IssueDate)
+	due, err2 := time.Parse("2006-01-02", inv.DueDate)
+	if err1 == nil && err2 == nil && !due.Before(issue) {
+		r.DueDays = min(int(due.Sub(issue).Hours()/24), 365)
+	}
+	if err1 == nil {
+		r.AnchorDay = issue.Day()
+		next := r.Advance(inv.IssueDate)
+		for i := 0; next <= today && i < 600; i++ {
+			next = r.Advance(next)
+		}
+		r.NextRun = next
+	}
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
 }
 
 func addDays(iso string, n int) string {
@@ -144,6 +192,10 @@ func (s *Server) recurringSave(c *Ctx) error {
 	r.DueDays, _ = strconv.Atoi(c.form("due_days"))
 	r.AutoSend = c.form("auto_send") == "1"
 	r.Notes = clip(c.form("notes"), 4000)
+	r.Lang = ""
+	if l := c.form("lang"); i18n.Valid(l) {
+		r.Lang = l
+	}
 	r.BankAccountID = s.bankChoice(c)
 	r.CardPayment = c.form("card_payment") == "1"
 	r.AutoCharge = r.CardPayment && c.form("auto_charge") == "1"
@@ -164,6 +216,11 @@ func (s *Server) recurringSave(c *Ctx) error {
 		banks, _ := s.Store.BankAccounts(co.ID)
 		p := s.page(c, c.t("recurring.new"), "recurring", s.recurringFormExtras(c,
 			&recurringFormData{R: r, Clients: clients, IsNew: isNew, CanSend: co.HasResend(), Banks: banks}))
+		if fid, _ := strconv.ParseInt(c.form("from"), 10, 64); fid != 0 && isNew {
+			if inv, err := s.Store.Invoice(co.ID, fid); err == nil {
+				p.Data.(*recurringFormData).From = inv
+			}
+		}
 		p.Error = c.t(key)
 		return s.render(c, 400, "recurring_form", p)
 	}
@@ -205,6 +262,11 @@ func (s *Server) recurringSave(c *Ctx) error {
 	}
 	if isNew {
 		c.audit("recurring.created", r.Name)
+		if fid, _ := strconv.ParseInt(c.form("from"), 10, 64); fid != 0 {
+			if err := s.Store.AttachToRecurring(co.ID, fid, r.ID); err != nil {
+				slog.Warn("attach invoice to schedule", "invoice", fid, "err", err)
+			}
+		}
 	}
 	c.ok("recurring.saved")
 	// generate now if the first run is today or in the past, before showing

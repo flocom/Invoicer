@@ -30,13 +30,14 @@
 {{if $r.LastError}}<div class="flash flash-err">{{.T "recurring.last_error"}} {{$r.LastError}}</div>{{end}}
 <form method="post" class="invoice-editor stack" data-invoice-form data-first-run data-today="{{$d.Today}}" data-active="{{if $r.Active}}1{{end}}">
   <input type="hidden" name="first_mode" value="">
+  {{if $d.From}}<input type="hidden" name="from" value="{{$d.From.ID}}">
+  <div class="note info">{{template "icon" "repeat"}}<span>{{.T "recurring.from_invoice" $d.From.Title}}</span></div>{{end}}
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <div class="card stack">
     <div class="grid-4">
       <div class="field span-2"><label for="name">{{.T "recurring.name"}}</label><input id="name" name="name" required maxlength="200" value="{{$r.Name}}" placeholder="{{.T "recurring.name_ph"}}" aria-describedby="name_hint"><p class="hint" id="name_hint">{{.T "recurring.name_hint"}}</p></div>
       <div class="field span-2"><label for="client_id">{{.T "invoice.client"}}</label>
         {{template "clientselect" (dict "P" $ "Clients" $d.Clients "Sel" $r.ClientID "Next" (.CPath "/recurring/new") "Cards" $d.Cards)}}
-        <p class="hint">{{.T "recurring.lang_hint"}}</p>
       </div>
     </div>
     <div class="grid-4">
@@ -58,7 +59,10 @@
     <div class="grid-4">
       <div class="field"><label for="end_date">{{.T "recurring.end_date"}}</label><input id="end_date" name="end_date" type="date" value="{{$r.EndDate}}"><p class="hint">{{.T "recurring.optional"}}</p></div>
       <div class="field"><label for="remaining">{{.T "recurring.remaining"}}</label><input id="remaining" name="remaining" type="number" min="0" value="{{if ge $r.Remaining 0}}{{$r.Remaining}}{{end}}" placeholder="∞"><p class="hint">{{.T "recurring.remaining_hint"}}</p></div>
-      <div class="field span-2 align-end">
+      <div class="field"><label for="lang">{{.T "field.doc_language"}}</label>
+        <select id="lang" name="lang"><option value="">{{.T "recurring.lang_client"}}</option>{{range langs}}<option value="{{.}}" {{if eq . $r.Lang}}selected{{end}}>{{$.TS "lang." .}}</option>{{end}}</select>
+        <p class="hint">{{.T "recurring.lang_hint"}}</p></div>
+      <div class="field align-end">
         <label class="check"><input type="checkbox" name="auto_send" value="1" {{if $r.AutoSend}}checked{{end}} {{if not $d.CanSend}}disabled{{end}}> {{.T "recurring.auto_send"}}</label>
         {{if not $d.CanSend}}<p class="hint">{{.T "recurring.auto_send_needs_email"}}</p>{{end}}
       </div>
