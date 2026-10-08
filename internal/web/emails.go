@@ -45,3 +45,21 @@ func (s *Server) emailHTML(c *Ctx) error {
 	_, err = c.W.Write([]byte(e.HTML))
 	return err
 }
+
+const stripeLogPerPage = 100
+
+// stripeLogList shows what happened on Stripe: payment links, payments,
+// card charges, saved cards and webhooks received.
+func (s *Server) stripeLogList(c *Ctx) error {
+	page, _ := strconv.Atoi(c.R.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	list, total, err := s.Store.CompanyStripeLog(c.Company.ID, stripeLogPerPage, (page-1)*stripeLogPerPage)
+	if err != nil {
+		return err
+	}
+	return s.render(c, 200, "stripe_log", s.page(c, c.t("stripelog.title"), "invoices", map[string]any{
+		"Entries": list, "Page": page, "HasNext": page*stripeLogPerPage < total, "Total": total, "HasStripe": c.Company.HasStripe(),
+	}))
+}

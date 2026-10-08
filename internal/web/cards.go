@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -202,10 +203,19 @@ func (s *Server) publicCard(c *Ctx) error {
 		}
 	}
 	card, _ := s.Store.DefaultCard(co.ID, cl.ID)
-	p := s.page(c, c.t("card.page_title"), "", map[string]any{
+	d := map[string]any{
 		"Co": co, "Client": cl, "Card": card, "Saved": saved, "Token": sc.CardToken, "CanSetup": co.HasStripe(),
 		"HasLogo": len(co.Logo) > 0, "SellerName": co.DisplayName(),
-	})
+	}
+	if card != nil {
+		brand := strings.ToUpper(card.Brand)
+		if brand == "" {
+			brand = "CARD"
+		}
+		d["Brand"], d["Expired"] = brand, card.Expired(s.App.Today())
+		d["Expiry"] = fmt.Sprintf("%02d/%02d", card.ExpMonth, card.ExpYear%100)
+	}
+	p := s.page(c, c.t("card.page_title"), "", d)
 	p.Bare = true
 	c.W.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	c.W.Header().Set("Referrer-Policy", "no-referrer")

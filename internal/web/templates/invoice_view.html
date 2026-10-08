@@ -162,11 +162,18 @@
         <li>{{.T "invoice.created_at" (.DateTime $inv.CreatedAt)}}</li>
         {{if $inv.SentAt}}<li>{{.T "invoice.sent_at" (.DateTime $inv.SentAt)}}</li>{{end}}
         {{range $d.Emails}}<li class="{{if eq .Status "failed"}}danger{{end}}"><a href="{{$.CPath "/emails/%d" .ID}}">{{$.TS "email." .Kind}}</a> → {{.To}} · {{$.DateTime .CreatedAt}}{{if .Error}}<br><span class="small">{{.Error}}</span>{{end}}</li>{{end}}
-        {{range $d.Charges}}<li class="{{if eq .Status "failed"}}danger{{else if eq .Status "succeeded"}}ok{{end}}">{{$.TS "card.charge_status." .Status}} · {{.CardLabel}} · {{$.Money .Amount $inv.Currency}}{{if .Automatic}} ({{$.T "card.automatic"}}){{end}} · {{$.DateTime .CreatedAt}}{{if .Error}}<br><span class="small">{{.Error}}</span>{{end}}</li>{{end}}
+        {{if not $d.StripeLog}}{{range $d.Charges}}<li class="{{if eq .Status "failed"}}danger{{else if eq .Status "succeeded"}}ok{{end}}">{{$.TS "card.charge_status." .Status}} · {{.CardLabel}} · {{$.Money .Amount $inv.Currency}}{{if .Automatic}} ({{$.T "card.automatic"}}){{end}} · {{$.DateTime .CreatedAt}}{{if .Error}}<br><span class="small">{{.Error}}</span>{{end}}</li>{{end}}{{end}}
         {{if $inv.PaidAt}}<li class="ok">{{.T "invoice.paid_at" (.DateTime $inv.PaidAt)}}</li>{{end}}
         {{if $inv.VoidedAt}}<li>{{.T "invoice.voided_at" (.DateTime $inv.VoidedAt)}}</li>{{end}}
       </ul>
       {{if $d.Emails}}<p class="small"><a href="{{.CPath "/emails"}}">{{.T "emails.view_all"}} →</a></p>{{end}}
+      {{if $d.StripeLog}}
+      <h4 class="timeline-head">{{template "icon" "card"}}Stripe</h4>
+      <ul class="timeline">
+        {{range $d.StripeLog}}<li class="lv-{{.Level}}"><strong>{{$.TS "stripelog." .Event}}</strong>{{if .Amount}} · {{$.Money .Amount .Currency}}{{end}} · {{$.DateTime .CreatedAt}}{{if .Detail}}<br><span class="small">{{.Detail}}</span>{{end}}{{if .Ref}}<br><span class="mono small muted">{{.Ref}}</span>{{end}}</li>{{end}}
+      </ul>
+      <p class="small"><a href="{{.CPath "/stripe-log"}}">{{.T "stripelog.view_all"}} →</a></p>
+      {{end}}
       {{if eq $inv.Status "open"}}
       <form method="post" action="{{.CPath "/invoices/%d/reminders" $inv.ID}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
         <button class="link small" type="submit">{{if $inv.RemindersEnabled}}{{.T "invoice.reminders_on"}}{{else}}{{.T "invoice.reminders_off"}}{{end}}</button></form>

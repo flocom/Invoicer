@@ -23,9 +23,11 @@ type Content struct {
 	DaysLate    int
 	Link        string
 	Link2       string // secondary link: pay online by card (Stripe Checkout)
-	Card        string // saved card label (charge_failed)
-	Message     string // optional custom message from the sender
-	Bank        [][2]string
+	Card        string // saved card label (charge_failed, owner notifications)
+	// owner notifications: ClientName is the payer, Message the failure reason
+	ClientNotified bool
+	Message        string // optional custom message from the sender
+	Bank           [][2]string
 }
 
 var accentRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -113,6 +115,29 @@ func Render(c Content) (subject, html, text string) {
 		v.Paragraphs = []string{greet, t("mail.charge_failed.body", c.Number, c.Card), t("mail.charge_failed.body2")}
 		v.Button = t("mail.update_card")
 		v.Button2 = t("mail.pay_other_card")
+	case "owner_paid":
+		v.Subject = t("mail.owner_paid.subject", c.Number, c.ClientName)
+		v.Heading = t("mail.owner_paid.heading")
+		v.Paragraphs = []string{t("mail.hello"), t("mail.owner_paid.body", c.ClientName, c.Number)}
+		if c.Card != "" {
+			v.Paragraphs[1] = t("mail.owner_paid.card", c.Card, c.Number, c.ClientName)
+		}
+		v.AmountLabel = t("mail.amount_paid")
+		v.DueDate = ""
+		v.Button = t("mail.view_invoice")
+		v.Closing = t("mail.owner_closing")
+	case "owner_charge_failed":
+		v.Subject = t("mail.owner_failed.subject", c.Number, c.ClientName)
+		v.Heading = t("mail.owner_failed.heading")
+		v.Paragraphs = []string{t("mail.hello"), t("mail.owner_failed.body", c.Number, c.ClientName, c.Card)}
+		if c.ClientNotified {
+			v.Paragraphs = append(v.Paragraphs, t("mail.owner_failed.notified"))
+		} else {
+			v.Paragraphs = append(v.Paragraphs, t("mail.owner_failed.not_notified"))
+		}
+		v.DueDate = ""
+		v.Button = t("mail.view_invoice")
+		v.Closing = t("mail.owner_closing")
 	case "card_update":
 		v.Subject = t("mail.card_update.subject", c.CompanyName)
 		v.Heading = t("mail.card_update.heading")

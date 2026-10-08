@@ -467,6 +467,7 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	if err := a.Store.SaveStripeSession(store.StripeSession{ID: s.ID, InvoiceID: inv.ID, Amount: inv.Due(), URL: s.URL, ExpiresAt: s.ExpiresAt}); err != nil {
 		return "", err
 	}
+	a.logStripe(co, inv, store.StripeLog{Event: "checkout.created", Ref: s.ID, Amount: inv.Due()})
 	return s.URL, nil
 }
 
@@ -481,15 +482,18 @@ func (a *App) ExpireSessions(ctx context.Context, co *store.Company, invoiceID i
 		return
 	}
 	key := a.StripeKey(co)
+	inv, _ := a.Store.Invoice(co.ID, invoiceID)
 	for _, ss := range sessions {
 		if ss.ID == keep {
 			continue
 		}
 		if err := stripe.ExpireCheckout(ctx, key, ss.ID); err != nil {
 			slog.Warn("could not expire Stripe session", "session", ss.ID, "err", err)
+			a.logStripe(co, inv, store.StripeLog{Event: "checkout.expire_failed", Level: "warn", Ref: ss.ID, Detail: err.Error()})
 			continue
 		}
 		a.Store.SetStripeSessionStatus(ss.ID, "expired")
+		a.logStripe(co, inv, store.StripeLog{Event: "checkout.closed", Ref: ss.ID, Amount: ss.Amount})
 	}
 }
 
@@ -509,13 +513,21 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 	}
 	switch {
 	case s.Status == "expired":
-		a.Store.SetStripeSessionStatus(s.ID, "expired")
+		if known.Status == "open" {
+			a.Store.SetStripeSessionStatus(s.ID, "expired")
+			a.logStripe(co, inv, store.StripeLog{Event: "checkout.expired", Ref: s.ID, Amount: known.Amount})
+		}
 		return nil
 	case s.PaymentStatus != "paid":
 		return nil
 	}
 	if !strings.EqualFold(s.Currency, inv.Currency) {
 		a.Store.Audit(0, co.ID, "", "payment.stripe_currency_mismatch", s.ID)
+		if known.Status == "open" {
+			a.Store.SetStripeSessionStatus(s.ID, "mismatch")
+			a.logStripe(co, inv, store.StripeLog{Event: "payment.currency_mismatch", Level: "error", Ref: s.ID, Amount: s.AmountTotal,
+				Currency: strings.ToUpper(s.Currency)})
+		}
 		return nil // do not make Stripe retry: needs a manual check
 	}
 	if inv.Status == store.StatusVoid {
@@ -524,18 +536,30 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 		a.Store.Audit(0, co.ID, "", "payment.stripe_on_void_invoice",
 			fmt.Sprintf("%s %s — refund needed (%s)", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en"), firstNonEmpty(s.PaymentIntent, s.ID)))
 		slog.Error("Stripe payment received for a voided invoice", "invoice", inv.ID, "session", s.ID)
+		if known.Status != "complete" {
+			a.logStripe(co, inv, store.StripeLog{Event: "payment.on_void", Level: "error", Ref: firstNonEmpty(s.PaymentIntent, s.ID),
+				Amount: s.AmountTotal})
+		}
 		return nil
 	}
 	if s.AmountTotal > inv.Due() {
 		a.Store.Audit(0, co.ID, "", "payment.stripe_overpaid",
 			fmt.Sprintf("%s paid %s, due %s", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en"), money.Format(inv.Due(), inv.Currency, "en")))
 	}
-	becamePaid, err := a.Store.RecordPayment(inv.ID, store.Payment{Amount: s.AmountTotal, Method: "stripe", Reference: firstNonEmpty(s.PaymentIntent, s.ID),
-		PaidOn: a.Today(), StripeSessionID: s.ID}, 0)
+	recorded, becamePaid, err := a.Store.RecordPaymentOnce(inv.ID, store.Payment{Amount: s.AmountTotal, Method: "stripe",
+		Reference: firstNonEmpty(s.PaymentIntent, s.ID), PaidOn: a.Today(), StripeSessionID: s.ID}, 0)
 	if err != nil {
 		return err
 	}
 	a.Store.SetStripeSessionStatus(s.ID, "complete")
+	if !recorded {
+		return nil // already applied (webhook and return page racing)
+	}
+	a.logStripe(co, inv, store.StripeLog{Event: "payment.received", Level: "ok", Ref: firstNonEmpty(s.PaymentIntent, s.ID), Amount: s.AmountTotal})
+	if s.AmountTotal > inv.Due() {
+		a.logStripe(co, inv, store.StripeLog{Event: "payment.overpaid", Level: "warn", Ref: firstNonEmpty(s.PaymentIntent, s.ID),
+			Amount: s.AmountTotal - inv.Due()})
+	}
 	a.saveCheckoutCard(ctx, co, inv, s)
 	a.ExpireSessions(ctx, co, inv.ID, s.ID)
 	a.Store.Audit(0, co.ID, "", "payment.stripe", fmt.Sprintf("%s %s", inv.Number, money.Format(s.AmountTotal, inv.Currency, "en")))
@@ -544,5 +568,6 @@ func (a *App) ApplyStripeSession(ctx context.Context, co *store.Company, s *stri
 			a.SendReceipt(ctx, co, inv)
 		}
 	}
+	a.notifyOwner(ctx, co, inv, ownerNote{Kind: "owner_paid", Amount: s.AmountTotal, IdempotencyKey: "owner-paid-" + s.ID})
 	return nil
 }

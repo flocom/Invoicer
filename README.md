@@ -67,6 +67,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 - Public invoice page with **Pay by card** (Stripe Checkout); the PDF QR code opens it
 - **Saved cards**: recurring invoices can charge the client's card automatically; a failed payment e-mails the client a link to update their card; charge any unpaid invoice from the client page with the card of your choice
 - Stripe webhook set up automatically — no copy-pasting secrets
+- **You are told by e-mail** (at the company's address) when a card payment goes through or an automatic charge is declined; a **Stripe log** shows every payment link, payment, charge and webhook
 - Several bank accounts per company (one per currency or more); each invoice shows the account in its currency, or the one you pick, or none
 - Bank transfer details + **SEPA QR code** on EUR invoices, optionally included in e-mails
 - Automatic receipts, overdue tracking, dashboards

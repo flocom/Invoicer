@@ -58,6 +58,12 @@ func newFakeAPIs(t *testing.T) *fakeAPIs {
 			f.n++
 			fmt.Fprintf(w, `{"id":"cs_%s_%d","url":"https://checkout.test/%d","status":"open","mode":%q,"expires_at":%d}`,
 				r.PostForm.Get("mode"), f.n, f.n, r.PostForm.Get("mode"), time.Now().Add(time.Hour).Unix())
+		case strings.HasPrefix(p, "/v1/checkout/sessions/cs_payment_") && r.Method == "GET":
+			id := strings.TrimPrefix(p, "/v1/checkout/sessions/")
+			n, _ := strconv.Atoi(strings.TrimPrefix(id, "cs_payment_"))
+			co := f.checkouts[n-1]
+			fmt.Fprintf(w, `{"id":%q,"status":"complete","mode":"payment","payment_status":"paid","amount_total":%s,"currency":%q,"payment_intent":"pi_%s"}`,
+				id, co.Get("line_items[0][price_data][unit_amount]"), co.Get("line_items[0][price_data][currency]"), id)
 		case strings.HasPrefix(p, "/v1/checkout/sessions/cs_setup_"):
 			fmt.Fprintf(w, `{"id":%q,"status":"complete","mode":"setup","setup_intent":"seti_1","customer":"cus_1"}`, strings.TrimPrefix(p, "/v1/checkout/sessions/"))
 		case p == "/v1/setup_intents/seti_1":
@@ -137,7 +143,9 @@ func TestSavedCardsAndCharges(t *testing.T) {
 	e.app.Store.DB.QueryRow(`SELECT id FROM card_setups`).Scan(&setupID)
 	anon.get("/card/" + token + "?session_id=" + setupID)
 	anon.must("your card has been saved")
-	anon.must("Visa •••• 4242")
+	anon.must("•••• •••• •••• 4242")
+	anon.must("VISA")
+	anon.must("Replace my card")
 	anon.get("/card/notavalidtokennotavalidtoken")
 	if anon.status != 404 {
 		t.Fatalf("unknown card token: %d", anon.status)
@@ -163,7 +171,7 @@ func TestSavedCardsAndCharges(t *testing.T) {
 		t.Fatalf("charge request: %v idem=%q", c, api.idem[0])
 	}
 	b.get("/c/1/invoices/1")
-	b.must("Card charged")
+	b.must("Saved card charged")
 
 	// recurring invoice charged automatically on the default card
 	b.post("/c/1/recurring/new", url.Values{"name": {"Hosting"}, "client_id": {"1"}, "currency": {"EUR"}, "interval_count": {"1"},
@@ -208,7 +216,7 @@ func TestSavedCardsAndCharges(t *testing.T) {
 		t.Fatalf("recurring error: %q", r.LastError)
 	}
 	b.get("/c/1/invoices/" + strconv.FormatInt(failed.ID, 10))
-	b.must("Card charge failed")
+	b.must("Charge declined")
 
 	// paying it online saves the new card on the client's customer
 	resp, err = anon.c.Get(e.srv.URL + "/pay/" + failed.PublicToken)

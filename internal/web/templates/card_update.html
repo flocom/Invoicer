@@ -1,18 +1,43 @@
-{{define "content"}}
-{{$d := .Data}}
-<div class="public">
-  <header class="public-head">
-    {{if $d.HasLogo}}<img class="public-logo" src="/logo/{{$d.Co.PublicID}}" alt="{{$d.SellerName}}">{{else}}<strong class="public-name">{{$d.SellerName}}</strong>{{end}}
-  </header>
-  {{if $d.Saved}}<div class="flash flash-ok">{{.T "card.public_saved"}}</div>{{end}}
-  <div class="card public-card stack">
-    <h1>{{.T "card.page_title"}}</h1>
-    <p>{{.T "card.public_intro" $d.SellerName}}</p>
-    {{if $d.Card}}<p>{{.T "card.public_current"}} <strong>{{$d.Card.Label}}</strong></p>{{end}}
+{{define "content"}}{{$d := .Data}}
+<div class="cardpage">
+  <header class="cardpage-head">{{if $d.HasLogo}}<img class="public-logo" src="/logo/{{$d.Co.PublicID}}" alt="{{$d.SellerName}}">{{else}}<strong class="public-name">{{$d.SellerName}}</strong>{{end}}</header>
+
+  <div class="card cardpage-card">
+    {{if $d.Saved}}<div class="cardpage-done"><span class="cardpage-done-icon">{{template "icon" "check"}}</span><div><strong>{{.T "card.public_saved_title"}}</strong><p>{{.T "card.public_saved"}}</p></div></div>{{end}}
+
+    <div class="cardpage-intro">
+      <div class="muted small upper">{{.T "card.public_eyebrow"}}</div>
+      <h1>{{if $d.Card}}{{.T "card.public_title_update"}}{{else}}{{.T "card.public_title_add"}}{{end}}</h1>
+      <p>{{.T "card.public_intro" $d.SellerName}}</p>
+    </div>
+
+    {{if $d.Card}}
+    <div class="cc{{if $d.Expired}} cc-expired{{end}}" aria-label="{{$d.Card.Label}}">
+      <div class="cc-top"><span class="cc-chip"></span><span class="cc-brand">{{$d.Brand}}</span></div>
+      <div class="cc-number">•••• •••• •••• {{$d.Card.Last4}}</div>
+      <div class="cc-bottom">
+        <div><span class="cc-label">{{.T "card.public_holder"}}</span><span class="cc-value">{{$d.Client.Name}}</span></div>
+        <div class="cc-exp"><span class="cc-label">{{.T "card.public_expires"}}</span><span class="cc-value">{{$d.Expiry}}</span></div>
+      </div>
+    </div>
+    <div class="cardpage-status {{if $d.Expired}}is-expired{{else}}is-active{{end}}"><span class="dot"></span>{{if $d.Expired}}{{.T "card.public_expired"}}{{else}}{{.T "card.public_active"}}{{end}}</div>
+    {{else}}
+    <div class="cc cc-empty"><div>{{template "icon" "card"}}<span>{{.T "card.public_none"}}</span></div></div>
+    {{end}}
+
     {{if $d.CanSetup}}
-    <div><a class="btn btn-primary btn-lg" href="/card/{{$d.Token}}/setup">{{template "icon" "card"}}{{if $d.Card}}{{.T "card.public_replace"}}{{else}}{{.T "card.public_add"}}{{end}}</a></div>
-    <p class="hint">{{.T "card.public_secure"}}</p>
-    {{else}}<p class="muted">{{.T "card.public_unavailable"}}</p>{{end}}
+    <a class="btn btn-primary btn-lg btn-block" href="/card/{{$d.Token}}/setup">{{template "icon" "lock"}}{{if $d.Card}}{{.T "card.public_replace"}}{{else}}{{.T "card.public_add"}}{{end}}</a>
+    <p class="cardpage-hint">{{.T "card.public_secure"}}</p>
+    {{else}}
+    <div class="note warn"><span>{{.T "card.public_unavailable"}}</span></div>
+    {{end}}
+
+    <ul class="cardpage-trust">
+      <li>{{template "icon" "lock"}}<span>{{.T "card.public_trust_stripe"}}</span></li>
+      <li>{{template "icon" "check"}}<span>{{.T "card.public_trust_nocharge"}}</span></li>
+      <li>{{template "icon" "shield"}}<span>{{.T "card.public_trust_usage" $d.SellerName}}</span></li>
+    </ul>
   </div>
-</div>
-{{end}}
+
+  <p class="cardpage-foot">{{template "icon" "lock"}}{{.T "card.public_footer"}}</p>
+</div>{{end}}
