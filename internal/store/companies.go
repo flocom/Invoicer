@@ -153,6 +153,25 @@ func (s *Store) AllCompanies() ([]*Company, error) {
 	return out, rows.Err()
 }
 
+// StripeCompanies lists every company connected to Stripe, archived ones
+// included (their webhook must follow the server too).
+func (s *Store) StripeCompanies() ([]*Company, error) {
+	rows, err := s.DB.Query(`SELECT ` + companyCols + ` FROM companies WHERE length(stripe_key) > 0 ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Company
+	for rows.Next() {
+		c, err := scanCompany(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) CanAccessCompany(u *User, companyID int64) bool {
 	if u.IsAdmin() {
 		var n int

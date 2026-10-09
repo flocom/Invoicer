@@ -421,45 +421,88 @@ func (a *App) ConfigureStripe(ctx context.Context, co *store.Company, key string
 	return account, warning, err
 }
 
-// RefreshStripeWebhooks points the Stripe webhook of every company to the
-// current public address (after a move to another domain or server). It
-// reports whether every company could be updated.
+// RefreshStripeWebhooks points the Stripe webhook of every company
+// (archived ones included) to the current public address, after a move to
+// another domain or server. For each company the new endpoint is created
+// first; only then are the endpoints of this company that point elsewhere
+// (the old server) deleted, found on the Stripe account itself so none is
+// left behind even if its id was lost. It reports whether everything is
+// done; otherwise it is safe to run again.
 func (a *App) RefreshStripeWebhooks(ctx context.Context) bool {
-	cos, err := a.Store.AllCompanies()
+	if !a.IsPublicHTTPS() {
+		return false
+	}
+	cos, err := a.Store.StripeCompanies()
 	if err != nil {
 		return false
 	}
 	ok := true
 	for _, co := range cos {
-		key := a.StripeKey(co)
-		if key == "" {
-			continue
-		}
-		if co.StripeWebhookID != "" {
-			if err := stripe.DeleteWebhook(ctx, key, co.StripeWebhookID); err != nil {
-				slog.Warn("stripe: old webhook not removed", "company", co.ID, "err", err)
-			}
-		}
-		var whID, whSecret string
-		if a.IsPublicHTTPS() {
-			whID, whSecret, err = stripe.CreateWebhook(ctx, key, a.BaseURL()+"/webhooks/stripe/"+co.PublicID)
-			if err != nil {
-				slog.Warn("stripe: webhook not created", "company", co.ID, "err", err)
-				ok = false
-			}
-		}
-		if err := a.Store.UpdateCompanyStripe(co.ID, co.StripeKey, a.Box.Seal(whSecret, aad(co, "stripe_whsec")), whID, co.StripeAccount); err != nil {
+		if !a.moveWebhook(ctx, co) {
 			ok = false
 		}
-		a.Store.Audit(0, co.ID, "", "stripe.webhook_moved", a.BaseURL())
 	}
 	return ok
 }
 
-// RefreshWebhooksIfMoved runs RefreshStripeWebhooks once after the public
-// address changed (restore on another server), as soon as it is reachable.
+func (a *App) moveWebhook(ctx context.Context, co *store.Company) bool {
+	key := a.StripeKey(co)
+	if key == "" {
+		return true
+	}
+	target := a.BaseURL() + "/webhooks/stripe/" + co.PublicID
+	eps, listErr := stripe.ListWebhooks(ctx, key)
+	if listErr != nil {
+		slog.Warn("stripe: cannot list webhooks", "company", co.ID, "err", listErr)
+	}
+	current := ""
+	for _, ep := range eps {
+		if ep.ID == co.StripeWebhookID && ep.URL == target {
+			current = ep.ID // already moved (an earlier, partly failed run)
+		}
+	}
+	if current == "" {
+		id, secret, err := stripe.CreateWebhook(ctx, key, target)
+		if err != nil {
+			// keep the old endpoint working until the new one exists
+			slog.Warn("stripe: webhook not created", "company", co.ID, "err", err)
+			return false
+		}
+		if err := a.Store.UpdateCompanyStripe(co.ID, co.StripeKey, a.Box.Seal(secret, aad(co, "stripe_whsec")), id, co.StripeAccount); err != nil {
+			stripe.DeleteWebhook(ctx, key, id)
+			return false
+		}
+		current = id
+		a.Store.Audit(0, co.ID, "", "stripe.webhook_moved", target)
+	}
+	// remove this company's endpoints that point anywhere else
+	stale := map[string]bool{}
+	if co.StripeWebhookID != "" && co.StripeWebhookID != current {
+		stale[co.StripeWebhookID] = true
+	}
+	for _, ep := range eps {
+		if ep.ID != current && strings.HasSuffix(ep.URL, "/webhooks/stripe/"+co.PublicID) {
+			stale[ep.ID] = true
+		}
+	}
+	ok := listErr == nil
+	for id := range stale {
+		if err := stripe.DeleteWebhook(ctx, key, id); err != nil {
+			slog.Warn("stripe: old webhook not removed", "company", co.ID, "webhook", id, "err", err)
+			ok = false
+			continue
+		}
+		a.Store.Audit(0, co.ID, "", "stripe.webhook_removed", id)
+	}
+	return ok
+}
+
+// RefreshWebhooksIfMoved runs RefreshStripeWebhooks after the public
+// address changed, as soon as it is reachable, until everything is done.
+// A restored copy that must not take the webhooks (a test server) holds
+// them until the owner moves them by hand.
 func (a *App) RefreshWebhooksIfMoved(ctx context.Context) {
-	if a.Store.Setting("stripe_webhooks_refresh") != "1" || !a.IsPublicHTTPS() {
+	if a.Store.Setting("stripe_webhooks_refresh") != "1" || a.Store.Setting("stripe_webhooks_hold") == "1" || !a.IsPublicHTTPS() {
 		return
 	}
 	if a.RefreshStripeWebhooks(ctx) {

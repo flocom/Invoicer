@@ -6,7 +6,9 @@
 //	invoicer reset-password EMAIL  print a one-time password reset link
 //	invoicer update                download the latest signed release and restart into it
 //	invoicer backup FILE           write a full encrypted backup (to move to another server)
-//	invoicer restore FILE [URL]    restore a full backup at the next start (URL: new public address)
+//	invoicer restore FILE [URL] [--keep-webhooks]
+//	                               restore a full backup at the next start (URL: new public address;
+//	                               --keep-webhooks: a copy, Stripe keeps notifying the original server)
 //	invoicer version
 package main
 
@@ -63,7 +65,7 @@ func main() {
 		os.Exit(forceUpdate(cfg))
 	case "backup", "restore":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "usage: invoicer backup FILE | invoicer restore FILE [https://new.address]")
+			fmt.Fprintln(os.Stderr, "usage: invoicer backup FILE | invoicer restore FILE [https://new.address] [--keep-webhooks]")
 			os.Exit(2)
 		}
 		if cmd == "backup" {
@@ -405,9 +407,17 @@ func backupCmd(cfg config.Config, path string) int {
 
 // restoreCmd stages a backup; the server swaps it in when it next starts.
 func restoreCmd(cfg config.Config, path string, rest []string) int {
-	newURL := ""
-	if len(rest) > 0 {
-		u, err := url.Parse(strings.TrimRight(rest[0], "/"))
+	newURL, moveWebhooks := "", true
+	var args []string
+	for _, a := range rest {
+		if a == "--keep-webhooks" {
+			moveWebhooks = false // a copy: the original server keeps receiving Stripe events
+			continue
+		}
+		args = append(args, a)
+	}
+	if len(args) > 0 {
+		u, err := url.Parse(strings.TrimRight(args[0], "/"))
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.Path != "" {
 			fmt.Fprintln(os.Stderr, "the new address must look like https://invoices.example.com")
 			return 2
@@ -434,7 +444,7 @@ func restoreCmd(cfg config.Config, path string, rest []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	if err := backup.Stage(cfg.DataDir, b, box, newURL); err != nil {
+	if err := backup.Stage(cfg.DataDir, b, box, newURL, moveWebhooks); err != nil {
 		fmt.Fprintln(os.Stderr, "restore failed:", err)
 		return 1
 	}

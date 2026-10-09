@@ -79,7 +79,7 @@ func TestFullBackupRestoreAndMove(t *testing.T) {
 	nb.get("/setup/restore")
 	nb.postFile("/setup/restore", url.Values{"passphrase": {"not the passphrase"}}, file)
 	nb.must("Wrong passphrase")
-	nb.postFile("/setup/restore", url.Values{"passphrase": {"moving day 2026"}}, file)
+	nb.postFile("/setup/restore", url.Values{"passphrase": {"moving day 2026"}, "move_webhooks": {"1"}}, file)
 	nb.must("Restoring")
 	nb.must("Sign in with the e-mail and password you used on the old server")
 	if !backup.Pending(fresh.app.Cfg.DataDir) {
@@ -91,6 +91,9 @@ func TestFullBackupRestoreAndMove(t *testing.T) {
 	}
 	if got, err := staged.Invoice(1, 1); err != nil || got.Number != inv.Number {
 		t.Fatalf("restored invoice: %v %v", got, err)
+	}
+	if staged.Setting("stripe_webhooks_hold") != "" || staged.Setting("stripe_webhooks_refresh") != "1" {
+		t.Fatal("the restored server should take the Stripe webhooks over")
 	}
 	if staged.Setting("base_url") != fresh.srv.URL {
 		t.Fatalf("the restored data should use the new address: %q", staged.Setting("base_url"))

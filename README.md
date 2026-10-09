@@ -202,7 +202,7 @@ docker run --rm -v invoicer-data:/data -v "$PWD":/out alpine tar czf /out/invoic
 2. On the old server, download the full backup, then fill in **This server has moved** with the new address: it stops generating invoices, reminders and charges, and links already sent to clients (`/i/…`, `/pay/…`, `/card/…`) redirect to the new server.
 3. Open the new address and choose **Restore a backup** on the first-start page. Sign in with your usual account (2FA included).
 
-Stored secrets are re-encrypted with the new server's key, payment links use the new address, and each company's Stripe webhook is moved to it automatically. Restoring over an existing instance is possible too (owner only); the replaced data is kept in `/data/backups`.
+Stored secrets are re-encrypted with the new server's key and payment links use the new address. Each company's Stripe webhook (archived companies included) is moved automatically: the new endpoint is created first, then every endpoint of that company pointing elsewhere is deleted from the Stripe account, and the move is retried every 10 minutes until complete. Restoring a copy for testing? Untick *move the Stripe webhooks here* (or pass `--keep-webhooks`): the original server keeps them. Restoring over an existing instance is possible too (owner only); the replaced data is kept in `/data/backups`.
 
 The same from the command line (the passphrase is asked, or read from `INVOICER_BACKUP_PASSPHRASE`):
 

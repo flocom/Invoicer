@@ -71,6 +71,12 @@
       <h2>{{.T "migrate.title"}}</h2>
       <p class="hint">{{.T "migrate.intro"}}</p>
       {{if $d.MovedTo}}<div class="note warn">{{template "icon" "external"}}<span>{{.T "migrate.moved_active" $d.MovedTo}}</span></div>{{end}}
+      {{if $d.HoldHooks}}<form method="post" action="/admin/system/webhooks-move" class="note warn stack" autocomplete="off" data-confirm="{{.T "migrate.webhooks_confirm"}}">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <span>{{.T "migrate.webhooks_held"}}</span>
+        <div class="row wrap"><input type="password" name="current" required autocomplete="current-password" placeholder="{{.T "field.current_password"}}" aria-label="{{.T "field.current_password"}}">
+          <button class="btn btn-sm" type="submit">{{.T "migrate.webhooks_move"}}</button></div>
+      </form>{{end}}
       <details class="disclosure" open>
         <summary>{{template "icon" "list"}}{{.T "migrate.steps_title"}}</summary>
         <ol class="steps small">
@@ -113,6 +119,8 @@
           <div class="field"><label for="rs_file">{{.T "migrate.file"}}</label><input id="rs_file" name="file" type="file" required accept=".invbak,application/octet-stream"></div>
           <div class="field"><label for="rs_pass">{{.T "migrate.passphrase"}}</label><input id="rs_pass" name="passphrase" type="password" required autocomplete="off"></div>
           <div class="field"><label for="rs_current">{{.T "field.current_password"}}</label><input id="rs_current" name="current" type="password" required autocomplete="current-password"></div>
+          <label class="check"><input type="checkbox" name="move_webhooks" value="1" checked> {{.T "migrate.move_webhooks"}}</label>
+          <p class="hint indent">{{.T "migrate.move_webhooks_hint"}}</p>
           <label class="check"><input type="checkbox" name="confirm" value="1" required> {{.T "migrate.restore_check"}}</label>
           <button class="btn btn-danger-ghost" type="submit">{{.T "migrate.restore_button"}}</button>
         </form>

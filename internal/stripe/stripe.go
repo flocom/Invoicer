@@ -162,11 +162,47 @@ func CreateWebhook(ctx context.Context, key, endpoint string) (id, secret string
 	return out.ID, out.Secret, nil
 }
 
+// DeleteWebhook removes an endpoint; one already gone is not an error.
 func DeleteWebhook(ctx context.Context, key, id string) error {
 	if id == "" {
 		return nil
 	}
-	return call(ctx, key, http.MethodDelete, "/v1/webhook_endpoints/"+url.PathEscape(id), nil, nil)
+	err := call(ctx, key, http.MethodDelete, "/v1/webhook_endpoints/"+url.PathEscape(id), nil, nil)
+	var se *Error
+	if errors.As(err, &se) && se.Status == http.StatusNotFound {
+		return nil
+	}
+	return err
+}
+
+type WebhookEndpoint struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+
+// ListWebhooks returns the webhook endpoints of the account.
+func ListWebhooks(ctx context.Context, key string) ([]WebhookEndpoint, error) {
+	var out []WebhookEndpoint
+	after := ""
+	for page := 0; page < 10; page++ {
+		path := "/v1/webhook_endpoints?limit=100"
+		if after != "" {
+			path += "&starting_after=" + url.QueryEscape(after)
+		}
+		var res struct {
+			Data    []WebhookEndpoint `json:"data"`
+			HasMore bool              `json:"has_more"`
+		}
+		if err := call(ctx, key, http.MethodGet, path, nil, &res); err != nil {
+			return nil, err
+		}
+		out = append(out, res.Data...)
+		if !res.HasMore || len(res.Data) == 0 {
+			break
+		}
+		after = res.Data[len(res.Data)-1].ID
+	}
+	return out, nil
 }
 
 type CheckoutParams struct {
