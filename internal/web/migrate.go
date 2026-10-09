@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -114,7 +115,7 @@ func (s *Server) readUploadedBackup(c *Ctx) (*backup.Bundle, string) {
 // stageAndRestart prepares the restore and restarts into it once the
 // waiting page has been sent.
 func (s *Server) stageAndRestart(c *Ctx, b *backup.Bundle) error {
-	if err := backup.Stage(s.App.Cfg.DataDir, b, s.App.Box, s.detectOrigin(c.R)); err != nil {
+	if err := backup.Stage(s.App.Cfg.DataDir, b, s.App.Box, s.detectOrigin(c.R), c.form("move_webhooks") == "1"); err != nil {
 		return err
 	}
 	p := s.page(c, c.t("migrate.restoring_title"), "", map[string]any{"Boot": s.bootID, "M": b.Manifest,
@@ -183,6 +184,31 @@ func (s *Server) setupRestore(c *Ctx) error {
 		return fail(err.Error())
 	}
 	return nil
+}
+
+// systemWebhooksMove takes the Stripe webhooks over from the original
+// server, for a restored copy that held them.
+func (s *Server) systemWebhooksMove(c *Ctx) error {
+	back := "/admin/system#migrate"
+	if !s.checkOwnerPassword(c) {
+		return c.redirect(back)
+	}
+	s.Store.SetSetting("stripe_webhooks_hold", "")
+	s.Store.SetSetting("stripe_webhooks_refresh", "1")
+	c.audit("system.webhooks_move", s.App.BaseURL())
+	if !s.App.IsPublicHTTPS() {
+		c.ok("migrate.webhooks_later")
+		return c.redirect(back)
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), time.Minute)
+	defer cancel()
+	s.App.RefreshWebhooksIfMoved(ctx)
+	if s.Store.Setting("stripe_webhooks_refresh") == "" {
+		c.ok("migrate.webhooks_moved")
+	} else {
+		c.ok("migrate.webhooks_retry")
+	}
+	return c.redirect(back)
 }
 
 // ---------- the old server, once moved ----------

@@ -220,6 +220,7 @@ type systemData struct {
 	PublicTLS bool
 	Address   geo.Config
 	MovedTo   string
+	HoldHooks bool // a restored copy left the Stripe webhooks to the original server
 }
 
 type backupInfo struct {
@@ -237,7 +238,7 @@ var commonZones = []string{"UTC", "Europe/Paris", "Europe/London", "Europe/Bruss
 func (s *Server) systemPage(c *Ctx) error {
 	d := &systemData{Timezone: s.App.Location().String(), Zones: commonZones, DataDir: s.App.Cfg.DataDir,
 		DetectedO: s.detectOrigin(c.R), PublicTLS: s.App.IsPublicHTTPS(), Address: s.App.AddressConfig(),
-		MovedTo: s.App.MovedTo()}
+		MovedTo: s.App.MovedTo(), HoldHooks: s.Store.Setting("stripe_webhooks_hold") == "1"}
 	if s.App.Updater != nil {
 		d.Update = s.App.Updater.Status()
 	}

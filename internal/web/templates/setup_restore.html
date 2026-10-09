@@ -10,7 +10,8 @@
         <input id="file" name="file" type="file" required accept=".invbak,application/octet-stream"></div>
       <div class="field"><label for="passphrase">{{.T "migrate.passphrase"}}</label>
         <input id="passphrase" name="passphrase" type="password" required autocomplete="off"></div>
-      <div class="note">{{template "icon" "shield"}}<span>{{.T "migrate.setup_note"}}</span></div>
+      <label class="check"><input type="checkbox" name="move_webhooks" value="1" checked> {{.T "migrate.move_webhooks"}}</label>
+      <p class="hint indent">{{.T "migrate.move_webhooks_hint"}}</p>
       <button class="btn btn-primary btn-block" type="submit">{{.T "migrate.restore_button"}}</button>
     </form>
     <p class="small center"><a href="/setup">← {{.T "migrate.setup_back"}}</a></p>

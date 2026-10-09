@@ -75,7 +75,7 @@ func TestBackupMovesToAServerWithAnotherKey(t *testing.T) {
 	cur.CreateFirstOwner("someone@else.test", "Else", security.HashPassword("correct horse battery"), "en")
 	cur.Close()
 	newBox := newBox(t)
-	if err := Stage(newDir, b, newBox, "https://new.example.org"); err != nil {
+	if err := Stage(newDir, b, newBox, "https://new.example.org", true); err != nil {
 		t.Fatal(err)
 	}
 	if !Pending(newDir) {

@@ -146,6 +146,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /admin/system/full-backup", s.h(s.owner(s.fullBackup)))
 	m.HandleFunc("POST /admin/system/restore", s.h(s.owner(s.systemRestore)))
 	m.HandleFunc("POST /admin/system/moved", s.h(s.owner(s.systemMoved)))
+	m.HandleFunc("POST /admin/system/webhooks-move", s.h(s.owner(s.systemWebhooksMove)))
 	m.HandleFunc("GET /admin/audit", s.h(s.admin(s.auditPage)))
 
 	// company scoped

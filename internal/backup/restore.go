@@ -22,10 +22,11 @@ const pendingDir = "restore"
 // live one, upgraded to this version's schema, its secrets re-encrypted
 // with this server's master key, and its public address set to newBaseURL
 // (the address the restore was made from; "" until the owner's first
-// visit). The swap
-// happens at the next start (ApplyPending), so nothing is half-replaced
+// visit). With moveWebhooks false (a copy, e.g. for testing) the Stripe
+// webhooks stay with the original server until the owner moves them. The
+// swap happens at the next start (ApplyPending), so nothing is half-replaced
 // while the server runs.
-func Stage(dataDir string, b *Bundle, box *security.Box, newBaseURL string) error {
+func Stage(dataDir string, b *Bundle, box *security.Box, newBaseURL string, moveWebhooks bool) error {
 	tmp := filepath.Join(dataDir, pendingDir+".tmp")
 	os.RemoveAll(tmp)
 	if err := os.MkdirAll(tmp, 0o700); err != nil {
@@ -45,7 +46,7 @@ func Stage(dataDir string, b *Bundle, box *security.Box, newBaseURL string) erro
 	if err != nil {
 		return fmt.Errorf("the database of this backup cannot be opened: %w", err)
 	}
-	if err := prepare(st, b, box, newBaseURL); err != nil {
+	if err := prepare(st, b, box, newBaseURL, moveWebhooks); err != nil {
 		st.Close()
 		return err
 	}
@@ -66,7 +67,7 @@ func Stage(dataDir string, b *Bundle, box *security.Box, newBaseURL string) erro
 	return nil
 }
 
-func prepare(st *store.Store, b *Bundle, box *security.Box, newBaseURL string) error {
+func prepare(st *store.Store, b *Bundle, box *security.Box, newBaseURL string, moveWebhooks bool) error {
 	var check string
 	if err := st.DB.QueryRow(`PRAGMA integrity_check`).Scan(&check); err != nil || check != "ok" {
 		return errors.New("the database of this backup is damaged")
@@ -93,6 +94,11 @@ func prepare(st *store.Store, b *Bundle, box *security.Box, newBaseURL string) e
 		st.SetSetting("base_url", newBaseURL)
 		st.SetSetting("stripe_webhooks_refresh", "1")
 	}
+	hold := ""
+	if !moveWebhooks {
+		hold = "1"
+	}
+	st.SetSetting("stripe_webhooks_hold", hold)
 	st.SetSetting("restored_at", strconv.FormatInt(time.Now().Unix(), 10))
 	st.Audit(0, 0, "", "system.restored", fmt.Sprintf("backup of %s made on %s (%s)", b.Manifest.BaseURL,
 		time.Unix(b.Manifest.CreatedAt, 0).UTC().Format("2006-01-02 15:04 MST"), b.Manifest.App))
