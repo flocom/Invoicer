@@ -194,12 +194,31 @@ The whole state lives in the `/data` volume: `invoicer.db` (SQLite), `master.key
 docker run --rm -v invoicer-data:/data -v "$PWD":/out alpine tar czf /out/invoicer-backup.tgz -C /data .
 ```
 
+### Moving to another server or domain
+
+**System → Full backup & move** downloads everything (data, e-mail history, users, settings and the connected Stripe/Resend keys) as one file encrypted with a passphrase you choose.
+
+1. Install Invoicer on the new server and point the new domain to it — don't create an account.
+2. On the old server, download the full backup, then fill in **This server has moved** with the new address: it stops generating invoices, reminders and charges, and links already sent to clients (`/i/…`, `/pay/…`, `/card/…`) redirect to the new server.
+3. Open the new address and choose **Restore a backup** on the first-start page. Sign in with your usual account (2FA included).
+
+Stored secrets are re-encrypted with the new server's key, payment links use the new address, and each company's Stripe webhook is moved to it automatically. Restoring over an existing instance is possible too (owner only); the replaced data is kept in `/data/backups`.
+
+The same from the command line (the passphrase is asked, or read from `INVOICER_BACKUP_PASSPHRASE`):
+
+```bash
+docker exec -it invoicer /app/invoicer backup /data/move.invbak            # on the old server
+docker exec -it invoicer /app/invoicer restore /data/move.invbak https://invoices.new-domain.com   # on the new one
+```
+
 ## 🛠 Command line
 
 ```bash
 docker exec invoicer /app/invoicer version
 docker exec invoicer /app/invoicer update                       # install the latest signed release
 docker exec invoicer /app/invoicer reset-password you@example.com  # one-time reset link (e.g. lost owner password)
+docker exec -it invoicer /app/invoicer backup /data/full.invbak     # full encrypted backup (see "Moving to another server")
+docker exec -it invoicer /app/invoicer restore /data/full.invbak    # restore it (the server restarts into it)
 ```
 
 ## 👩‍💻 Development

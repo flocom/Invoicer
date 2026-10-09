@@ -514,6 +514,23 @@
     dlg.querySelector("[data-dialog-close]").addEventListener("click", function () { dlg.close(); });
   });
 
+  // after a restore: wait for the server to come back (new boot id), then sign in
+  var wait = document.querySelector("[data-restart-wait]");
+  if (wait) {
+    var boot = wait.getAttribute("data-boot"), started = Date.now();
+    var poll = function () {
+      fetch("/boot", { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (id) {
+        if (id && id !== boot) { window.location.href = "/login"; return; }
+        retry();
+      }, retry);
+    };
+    var retry = function () {
+      if (Date.now() - started > 90000) { var late = wait.querySelector(".restore-late"); if (late) late.hidden = false; }
+      setTimeout(poll, 1500);
+    };
+    setTimeout(poll, 2000);
+  }
+
   // issue date moves the due date by the payment terms
   document.querySelectorAll("[data-issue-date]").forEach(function (issue) {
     var due = issue.form.querySelector("[data-due-date]");

@@ -599,3 +599,15 @@ body.bare { background: radial-gradient(1100px 520px at 50% -140px, #e6e8ff 0%, 
   .cc { padding: 1.1rem 1.2rem; border-radius: 15px; }
   .cc-number { font-size: 1.1rem; }
 }
+
+/* ---------- full backup, restore, move ---------- */
+.restore-wait { text-align: center; align-items: center; }
+.restore-wait .kv, .restore-wait .note { text-align: left; width: 100%; }
+.restore-spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--primary-soft); border-top-color: var(--primary); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .restore-spinner { animation-duration: 3s; } }
+.restore-late { color: var(--warn); font-size: .88rem; }
+.setup-restore-link { margin-top: 1.1rem; color: var(--muted); }
+ol.steps { margin: .6rem 0 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .45rem; color: var(--text-2); }
+#migrate .disclosure summary { display: flex; align-items: center; gap: .45rem; }
+#migrate .disclosure summary .icon { width: 16px; height: 16px; }

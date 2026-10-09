@@ -158,7 +158,30 @@ func PasswordProblem(pw string) string {
 
 // ---------- encryption of stored secrets ----------
 
-type Box struct{ aead cipher.AEAD }
+type Box struct {
+	aead cipher.AEAD
+	key  []byte
+}
+
+// NewBox makes a Box from a 32-byte master key.
+func NewBox(key []byte) (*Box, error) {
+	if len(key) != 32 {
+		return nil, errors.New("the master key must be 32 bytes")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return &Box{aead: aead, key: append([]byte(nil), key...)}, nil
+}
+
+// MasterKey returns a copy of the key (for full backups, which carry it
+// encrypted so secrets can be moved to a server with another key).
+func (b *Box) MasterKey() []byte { return append([]byte(nil), b.key...) }
 
 // LoadBox loads the master key from env or from <dataDir>/master.key, creating
 // the file on first start.
@@ -192,15 +215,7 @@ func LoadBox(dataDir, envKey string) (*Box, error) {
 			return nil, err
 		}
 	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	return &Box{aead: aead}, nil
+	return NewBox(key)
 }
 
 // Seal encrypts plaintext. aad binds the ciphertext to its location (for

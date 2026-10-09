@@ -266,3 +266,12 @@ func withTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
 	}
 	return tx.Commit()
 }
+
+// SchemaVersion is the number of migrations this binary knows.
+func SchemaVersion() int { return len(migrations) }
+
+// Snapshot writes a consistent copy of the database to path.
+func (s *Store) Snapshot(path string) error {
+	_, err := s.DB.Exec(`VACUUM INTO ?`, path)
+	return err
+}

@@ -5,10 +5,13 @@
 //	invoicer healthcheck           exit 0 if the local server answers
 //	invoicer reset-password EMAIL  print a one-time password reset link
 //	invoicer update                download the latest signed release and restart into it
+//	invoicer backup FILE           write a full encrypted backup (to move to another server)
+//	invoicer restore FILE [URL]    restore a full backup at the next start (URL: new public address)
 //	invoicer version
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -16,8 +19,10 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,6 +32,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/flocom/invoicer/internal/app"
+	"github.com/flocom/invoicer/internal/backup"
 	"github.com/flocom/invoicer/internal/config"
 	"github.com/flocom/invoicer/internal/security"
 	"github.com/flocom/invoicer/internal/store"
@@ -55,6 +61,15 @@ func main() {
 		os.Exit(resetPassword(cfg, os.Args[2]))
 	case "update":
 		os.Exit(forceUpdate(cfg))
+	case "backup", "restore":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: invoicer backup FILE | invoicer restore FILE [https://new.address]")
+			os.Exit(2)
+		}
+		if cmd == "backup" {
+			os.Exit(backupCmd(cfg, os.Args[2]))
+		}
+		os.Exit(restoreCmd(cfg, os.Args[2], os.Args[3:]))
 	case "", "serve":
 	default:
 		fmt.Fprintln(os.Stderr, "unknown command:", cmd)
@@ -78,6 +93,11 @@ func fatal(msg string, err error) {
 
 func serve(cfg config.Config) error {
 	slog.Info("starting Invoicer", "version", config.Version, "data", cfg.DataDir)
+	if applied, err := backup.ApplyPending(cfg.DataDir); err != nil {
+		return fmt.Errorf("restoring the backup failed: %w", err)
+	} else if applied {
+		slog.Info("backup restored; the previous data was kept in backups/")
+	}
 	st, err := store.Open(cfg.Path("invoicer.db"))
 	if err != nil {
 		return err
@@ -89,6 +109,7 @@ func serve(cfg config.Config) error {
 	}
 	up := updater.New(config.Repo, config.Version, cfg.Path("bin"), cfg.AutoUpdate)
 	a := app.New(cfg, st, box, up)
+	var restartOnce sync.Once
 	srv, err := web.New(a)
 	if err != nil {
 		return err
@@ -114,6 +135,20 @@ func serve(cfg config.Config) error {
 		mu.Lock()
 		web.Shutdown(c, servers...)
 		mu.Unlock()
+	}
+	a.Restart = func() {
+		restartOnce.Do(func() {
+			slog.Info("restarting")
+			shutdown()
+			st.Close()
+			exe, err := os.Executable()
+			if err == nil {
+				err = syscall.Exec(exe, os.Args, os.Environ())
+			}
+			// the container's restart policy brings the server back
+			slog.Error("restart failed, exiting", "err", err)
+			os.Exit(1)
+		})
 	}
 	up.BeforeRestart = func(v string) {
 		if _, err := st.Backup(cfg.Path("backups"), "pre-"+v, 5); err != nil {
@@ -159,6 +194,16 @@ func serve(cfg config.Config) error {
 			if err := updater.Exec(path, cfg.Path("bin"), v); err != nil {
 				slog.Error("restart failed", "err", err)
 			}
+		}
+	}()
+
+	// SIGUSR1 (sent by "invoicer restore") restarts to swap in the restored data
+	usr1 := make(chan os.Signal, 1)
+	signal.Notify(usr1, syscall.SIGUSR1)
+	go func() {
+		<-usr1
+		if backup.Pending(cfg.DataDir) {
+			a.Restart()
 		}
 	}()
 
@@ -302,4 +347,118 @@ func resetPassword(cfg config.Config, email string) int {
 	}
 	fmt.Printf("Password reset link for %s (valid 1 hour):\n%s/reset/%s\n", u.Email, base, tok)
 	return 0
+}
+
+// passphrase reads the backup passphrase from INVOICER_BACKUP_PASSPHRASE or
+// from the terminal.
+func passphrase(confirm bool) string {
+	if p := os.Getenv("INVOICER_BACKUP_PASSPHRASE"); p != "" {
+		return p
+	}
+	in := bufio.NewReader(os.Stdin)
+	fmt.Fprint(os.Stderr, "Backup passphrase: ")
+	p, _ := in.ReadString('\n')
+	p = strings.TrimRight(p, "\r\n")
+	if confirm {
+		fmt.Fprint(os.Stderr, "Again: ")
+		q, _ := in.ReadString('\n')
+		if strings.TrimRight(q, "\r\n") != p {
+			fmt.Fprintln(os.Stderr, "the passphrases differ")
+			os.Exit(1)
+		}
+	}
+	return p
+}
+
+// backupCmd is run with "docker exec -it invoicer /app/invoicer backup /data/x.invbak".
+func backupCmd(cfg config.Config, path string) int {
+	st, err := store.Open(cfg.Path("invoicer.db"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer st.Close()
+	box, err := security.LoadBox(cfg.DataDir, cfg.MasterKey)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := backup.Write(f, st, box, config.Version, passphrase(true)); err != nil {
+		f.Close()
+		os.Remove(path)
+		fmt.Fprintln(os.Stderr, "backup failed:", err)
+		return 1
+	}
+	if err := f.Close(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	st.Audit(0, 0, "cli", "system.full_backup", filepath.Base(path))
+	fmt.Println("full backup written to", path)
+	return 0
+}
+
+// restoreCmd stages a backup; the server swaps it in when it next starts.
+func restoreCmd(cfg config.Config, path string, rest []string) int {
+	newURL := ""
+	if len(rest) > 0 {
+		u, err := url.Parse(strings.TrimRight(rest[0], "/"))
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.Path != "" {
+			fmt.Fprintln(os.Stderr, "the new address must look like https://invoices.example.com")
+			return 2
+		}
+		newURL = u.Scheme + "://" + strings.ToLower(u.Host)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer f.Close()
+	b, err := backup.Read(f, passphrase(false))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	box, err := security.LoadBox(cfg.DataDir, cfg.MasterKey)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if err := backup.Stage(cfg.DataDir, b, box, newURL); err != nil {
+		fmt.Fprintln(os.Stderr, "restore failed:", err)
+		return 1
+	}
+	m := b.Manifest
+	fmt.Printf("Backup of %s (%s, %d companies, %d invoices) is ready.\n", m.BaseURL,
+		time.Unix(m.CreatedAt, 0).Format("2006-01-02 15:04"), m.Companies, m.Invoices)
+	// in the container the server is PID 1: ask it to restart into the restored data
+	if pid1IsInvoicer() && syscall.Kill(1, syscall.SIGUSR1) == nil {
+		fmt.Println("The server is restarting with the restored data.")
+	} else {
+		fmt.Println("Restart Invoicer to finish (docker restart invoicer).")
+	}
+	if newURL == "" {
+		fmt.Println("The public address will be recorded at the owner's first sign-in.")
+	}
+	return 0
+}
+
+// pid1IsInvoicer tells whether the server is PID 1 (the Docker image), so
+// it can be signalled; elsewhere PID 1 is the system's init.
+func pid1IsInvoicer() bool {
+	if os.Getpid() == 1 {
+		return false
+	}
+	b, err := os.ReadFile("/proc/1/cmdline")
+	return err == nil && strings.Contains(filepath.Base(strings.SplitN(string(b), "\x00", 2)[0]), "invoicer")
 }
