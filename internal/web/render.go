@@ -140,6 +140,7 @@ type Page struct {
 	AssetVer   string
 	BaseURL    string
 	NewOrigin  string // detected origin differs from the stored one (admin banner)
+	MovedTo    string // this server moved there (admin banner)
 	UpdateNote string
 	Bare       bool // no navigation (login, setup, public pages)
 	loc        *time.Location
@@ -188,6 +189,9 @@ func (s *Server) page(c *Ctx, title, nav string, data any) *Page {
 			if o := s.detectOrigin(c.R); o != "" && o != p.BaseURL && p.BaseURL != "" {
 				p.NewOrigin = o
 			}
+		}
+		if c.User.IsAdmin() {
+			p.MovedTo = s.App.MovedTo()
 		}
 		if c.User.IsOwner() && s.App.Updater != nil {
 			st := s.App.Updater.Status()

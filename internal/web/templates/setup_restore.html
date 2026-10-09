@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="auth">
+  <div class="auth-logo">{{template "brandmark" 34}} <span>Invoicer</span></div>
+  <div class="card auth-card">
+    <h1>{{.T "migrate.setup_title"}}</h1>
+    <p class="muted">{{.T "migrate.setup_intro"}}</p>
+    <form method="post" action="/setup/restore" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div class="field"><label for="file">{{.T "migrate.file"}}</label>
+        <input id="file" name="file" type="file" required accept=".invbak,application/octet-stream"></div>
+      <div class="field"><label for="passphrase">{{.T "migrate.passphrase"}}</label>
+        <input id="passphrase" name="passphrase" type="password" required autocomplete="off"></div>
+      <div class="note">{{template "icon" "shield"}}<span>{{.T "migrate.setup_note"}}</span></div>
+      <button class="btn btn-primary btn-block" type="submit">{{.T "migrate.restore_button"}}</button>
+    </form>
+    <p class="small center"><a href="/setup">← {{.T "migrate.setup_back"}}</a></p>
+  </div>
+</div>
+{{end}}

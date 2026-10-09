@@ -26,6 +26,7 @@ func (a *App) RunScheduler(ctx context.Context) {
 	jobs := []*job{
 		{name: "recurring", every: 10 * time.Minute, delay: 20 * time.Second, fn: a.RunRecurring},
 		{name: "stripe-reconcile", every: 10 * time.Minute, delay: 40 * time.Second, fn: a.ReconcileStripe},
+		{name: "stripe-webhooks", every: 10 * time.Minute, delay: 30 * time.Second, fn: a.RefreshWebhooksIfMoved},
 		{name: "reminders", every: time.Hour, delay: 2 * time.Minute, fn: a.RunReminders},
 		{name: "maintenance", every: 24 * time.Hour, delay: 5 * time.Minute, fn: a.Maintenance},
 		{name: "updates", every: 6 * time.Hour, delay: 45 * time.Second, fn: func(ctx context.Context) {
@@ -51,6 +52,9 @@ func (a *App) RunScheduler(ctx context.Context) {
 					continue
 				}
 				j.next = now.Add(j.every)
+				if a.MovedTo() != "" && j.name != "maintenance" && j.name != "updates" {
+					continue // the data now lives on another server: do not invoice twice
+				}
 				func() {
 					defer func() {
 						if r := recover(); r != nil {

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/flocom/invoicer/internal/app"
+	"github.com/flocom/invoicer/internal/backup"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/security"
 	"github.com/flocom/invoicer/internal/store"
@@ -42,6 +43,7 @@ type Server struct {
 	static     http.Handler
 	assetVer   string
 	csrfKey    []byte
+	bootID     string // changes at each start (the restore page waits for it)
 }
 
 func New(a *app.App) (*Server, error) {
@@ -57,7 +59,7 @@ func New(a *app.App) (*Server, error) {
 	s := &Server{App: a, Store: a.Store, tpl: t, limiter: newLimiter(), trustAll: tp == "true", noTrust: tp == "false",
 		cloudflare: tp == "cloudflare",
 		static:     http.FileServer(http.FS(sub)), assetVer: assetHash(sub),
-		csrfKey: []byte(security.Token(32))}
+		csrfKey: []byte(security.Token(32)), bootID: security.Token(9)}
 	return s, nil
 }
 
@@ -81,6 +83,12 @@ func (s *Server) Handler() http.Handler {
 
 	// public
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	m.HandleFunc("GET /boot", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write([]byte(s.bootID))
+	})
+	m.HandleFunc("GET /setup/restore", s.h(s.setupRestoreForm))
+	m.HandleFunc("POST /setup/restore", s.h(s.setupRestore))
 	m.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(noListing(s.static))))
 	m.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/favicon.svg", http.StatusMovedPermanently)
@@ -135,6 +143,9 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /admin/system/update-check", s.h(s.owner(s.updateCheck)))
 	m.HandleFunc("POST /admin/system/update-install", s.h(s.owner(s.updateInstall)))
 	m.HandleFunc("POST /admin/system/backup", s.h(s.owner(s.backupNow)))
+	m.HandleFunc("POST /admin/system/full-backup", s.h(s.owner(s.fullBackup)))
+	m.HandleFunc("POST /admin/system/restore", s.h(s.owner(s.systemRestore)))
+	m.HandleFunc("POST /admin/system/moved", s.h(s.owner(s.systemMoved)))
 	m.HandleFunc("GET /admin/audit", s.h(s.admin(s.auditPage)))
 
 	// company scoped
@@ -244,7 +255,17 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		if s.isHTTPS(r) {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 		}
-		r.Body = http.MaxBytesReader(sw, r.Body, 4<<20)
+		limit := int64(4 << 20)
+		if s.mayUploadBackup(r) {
+			limit = backup.MaxSize + 1<<20
+		}
+		r.Body = http.MaxBytesReader(sw, r.Body, limit)
+		if movedPath(r.URL.Path) && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			if to := s.App.MovedTo(); to != "" {
+				http.Redirect(sw, r, to+r.URL.RequestURI(), http.StatusMovedPermanently)
+				return
+			}
+		}
 		defer func() {
 			if rec := recover(); rec != nil {
 				slog.Error("panic", "err", rec, "path", r.URL.Path, "stack", string(debug.Stack()))
@@ -631,6 +652,7 @@ func (s *Server) syncOrigin(c *Ctx) {
 		slog.Info("public URL detected", "url", o)
 	case cur != o && strings.TrimPrefix(cur, "http://") == strings.TrimPrefix(o, "https://") && strings.HasPrefix(o, "https://"):
 		s.Store.SetSetting("base_url", o)
+		s.Store.SetSetting("stripe_webhooks_refresh", "1")
 		slog.Info("public URL upgraded to https", "url", o)
 	}
 }

@@ -1,0 +1,18 @@
+{{define "content"}}{{$d := .Data}}
+<div class="auth">
+  <div class="auth-logo">{{template "brandmark" 34}} <span>Invoicer</span></div>
+  <div class="card auth-card stack restore-wait" data-restart-wait data-boot="{{$d.Boot}}">
+    <div class="restore-spinner" aria-hidden="true"></div>
+    <h1>{{.T "migrate.restoring_title"}}</h1>
+    <p class="muted">{{.T "migrate.restoring_body"}}</p>
+    <dl class="kv small">
+      <dt>{{.T "migrate.from"}}</dt><dd class="mono break">{{if $d.M.BaseURL}}{{$d.M.BaseURL}}{{else}}–{{end}}</dd>
+      <dt>{{.T "migrate.made_on"}}</dt><dd>{{.DateTime $d.M.CreatedAt}}</dd>
+      <dt>{{.T "migrate.content"}}</dt><dd>{{.T "migrate.counts" $d.M.Companies $d.M.Invoices $d.M.Users}}</dd>
+    </dl>
+    <div class="note">{{template "icon" "shield"}}<span>{{.T "migrate.sign_in_old"}}</span></div>
+    <p class="restore-late" hidden>{{.T "migrate.restoring_late"}}</p>
+    <a class="btn btn-primary btn-block" href="/login">{{.T "migrate.go_login"}}</a>
+  </div>
+</div>
+{{end}}

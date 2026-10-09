@@ -219,6 +219,7 @@ type systemData struct {
 	DetectedO string
 	PublicTLS bool
 	Address   geo.Config
+	MovedTo   string
 }
 
 type backupInfo struct {
@@ -235,7 +236,8 @@ var commonZones = []string{"UTC", "Europe/Paris", "Europe/London", "Europe/Bruss
 
 func (s *Server) systemPage(c *Ctx) error {
 	d := &systemData{Timezone: s.App.Location().String(), Zones: commonZones, DataDir: s.App.Cfg.DataDir,
-		DetectedO: s.detectOrigin(c.R), PublicTLS: s.App.IsPublicHTTPS(), Address: s.App.AddressConfig()}
+		DetectedO: s.detectOrigin(c.R), PublicTLS: s.App.IsPublicHTTPS(), Address: s.App.AddressConfig(),
+		MovedTo: s.App.MovedTo()}
 	if s.App.Updater != nil {
 		d.Update = s.App.Updater.Status()
 	}
@@ -297,7 +299,16 @@ func (s *Server) systemDomain(c *Ctx) error {
 			return c.redirect("/admin/system")
 		}
 	}
-	s.Store.SetSetting("base_url", o)
+	if o != s.App.BaseURL() {
+		s.Store.SetSetting("base_url", o)
+		// Stripe must now call the new address
+		s.Store.SetSetting("stripe_webhooks_refresh", "1")
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			s.App.RefreshWebhooksIfMoved(ctx)
+		}()
+	}
 	c.audit("system.base_url", o)
 	c.ok("system.domain_saved", o)
 	back := safeNext(c.form("back"))

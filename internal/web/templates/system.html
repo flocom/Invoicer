@@ -67,6 +67,57 @@
       {{if $d.Address.GoogleKey}}<label class="check"><input type="checkbox" name="remove_key" value="1"> {{.T "settings.remove_key"}}</label>{{end}}
       <div class="form-actions"><button class="btn btn-primary" type="submit">{{.T "action.save"}}</button></div>
     </form>
+    <div class="card stack" id="migrate">
+      <h2>{{.T "migrate.title"}}</h2>
+      <p class="hint">{{.T "migrate.intro"}}</p>
+      {{if $d.MovedTo}}<div class="note warn">{{template "icon" "external"}}<span>{{.T "migrate.moved_active" $d.MovedTo}}</span></div>{{end}}
+      <details class="disclosure" open>
+        <summary>{{template "icon" "list"}}{{.T "migrate.steps_title"}}</summary>
+        <ol class="steps small">
+          <li>{{.T "migrate.step1"}}</li>
+          <li>{{.T "migrate.step2"}}</li>
+          <li>{{.T "migrate.step3"}}</li>
+          <li>{{.T "migrate.step4"}}</li>
+          <li>{{.T "migrate.step5"}}</li>
+        </ol>
+      </details>
+      <details class="disclosure">
+        <summary>{{template "icon" "download"}}{{.T "migrate.download"}}</summary>
+        <form method="post" action="/admin/system/full-backup" class="stack" autocomplete="off">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <p class="hint">{{.T "migrate.download_hint"}}</p>
+          <div class="grid-2">
+            <div class="field"><label for="bk_pass">{{.T "migrate.passphrase"}}</label><input id="bk_pass" name="passphrase" type="password" required minlength="10" autocomplete="new-password"></div>
+            <div class="field"><label for="bk_pass2">{{.T "migrate.passphrase_again"}}</label><input id="bk_pass2" name="passphrase2" type="password" required minlength="10" autocomplete="new-password"></div>
+          </div>
+          <div class="field"><label for="bk_current">{{.T "field.current_password"}}</label><input id="bk_current" name="current" type="password" required autocomplete="current-password"></div>
+          <button class="btn btn-primary" type="submit">{{template "icon" "download"}}{{.T "migrate.download_button"}}</button>
+        </form>
+      </details>
+      <details class="disclosure" {{if $d.MovedTo}}open{{end}}>
+        <summary>{{template "icon" "external"}}{{.T "migrate.moved"}}</summary>
+        <form method="post" action="/admin/system/moved" class="stack" autocomplete="off">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <p class="hint">{{.T "migrate.moved_hint"}}</p>
+          <div class="field"><label for="moved_to">{{.T "migrate.moved_to"}}</label><input id="moved_to" name="moved_to" type="url" placeholder="https://factures.nouveau-domaine.fr" value="{{$d.MovedTo}}" spellcheck="false"></div>
+          <div class="field"><label for="mv_current">{{.T "field.current_password"}}</label><input id="mv_current" name="current" type="password" required autocomplete="current-password"></div>
+          <div class="row wrap"><button class="btn" type="submit">{{.T "action.save"}}</button>
+            {{if $d.MovedTo}}<button class="btn btn-ghost" type="submit" name="clear" value="1">{{.T "migrate.moved_clear"}}</button>{{end}}</div>
+        </form>
+      </details>
+      <details class="disclosure">
+        <summary>{{template "icon" "repeat"}}{{.T "migrate.restore"}}</summary>
+        <form method="post" action="/admin/system/restore" enctype="multipart/form-data" class="stack" autocomplete="off" data-confirm="{{.T "migrate.restore_confirm"}}">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <div class="note warn"><span>{{.T "migrate.restore_warning"}}</span></div>
+          <div class="field"><label for="rs_file">{{.T "migrate.file"}}</label><input id="rs_file" name="file" type="file" required accept=".invbak,application/octet-stream"></div>
+          <div class="field"><label for="rs_pass">{{.T "migrate.passphrase"}}</label><input id="rs_pass" name="passphrase" type="password" required autocomplete="off"></div>
+          <div class="field"><label for="rs_current">{{.T "field.current_password"}}</label><input id="rs_current" name="current" type="password" required autocomplete="current-password"></div>
+          <label class="check"><input type="checkbox" name="confirm" value="1" required> {{.T "migrate.restore_check"}}</label>
+          <button class="btn btn-danger-ghost" type="submit">{{.T "migrate.restore_button"}}</button>
+        </form>
+      </details>
+    </div>
     <div class="card stack">
       <h2>{{.T "system.backups"}}</h2>
       <p class="hint">{{.T "system.backups_hint" $d.DataDir}}</p>

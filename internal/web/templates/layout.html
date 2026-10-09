@@ -82,6 +82,9 @@
       <a class="btn btn-sm" href="/admin/system">{{.T "banner.review"}}</a>
     </div>
     {{end}}
+    {{if .MovedTo}}
+    <div class="banner banner-warn"><span>{{.T "banner.moved" .MovedTo}}</span> <a class="btn btn-sm" href="/admin/system#migrate">{{.T "nav.system"}}</a></div>
+    {{end}}
     {{if eq .UpdateNote "required"}}
     <div class="banner banner-warn"><span>{{.T "banner.update_required"}}</span> <a class="btn btn-sm" href="/admin/system">{{.T "nav.system"}}</a></div>
     {{end}}

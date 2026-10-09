@@ -33,6 +33,9 @@ type App struct {
 	Store   *store.Store
 	Box     *security.Box
 	Updater *updater.Updater
+	// Restart stops the server and starts it again (set by main; nil in
+	// tests). Used to swap in a restored backup.
+	Restart func()
 
 	mu  sync.RWMutex
 	loc *time.Location
@@ -105,6 +108,10 @@ func (a *App) IsPublicHTTPS() bool {
 	}
 	return true
 }
+
+// MovedTo is the address of the server this instance moved to ("" when it
+// has not): its public links redirect there and its automatic jobs stop.
+func (a *App) MovedTo() string { return a.Store.Setting("moved_to") }
 
 func (a *App) PublicURL(inv *store.Invoice) string { return a.BaseURL() + "/i/" + inv.PublicToken }
 func (a *App) PayURL(inv *store.Invoice) string    { return a.BaseURL() + "/pay/" + inv.PublicToken }
@@ -412,6 +419,52 @@ func (a *App) ConfigureStripe(ctx context.Context, co *store.Company, key string
 	}
 	err = a.Store.UpdateCompanyStripe(co.ID, a.Box.Seal(key, aad(co, "stripe")), a.Box.Seal(whSecret, aad(co, "stripe_whsec")), whID, account)
 	return account, warning, err
+}
+
+// RefreshStripeWebhooks points the Stripe webhook of every company to the
+// current public address (after a move to another domain or server). It
+// reports whether every company could be updated.
+func (a *App) RefreshStripeWebhooks(ctx context.Context) bool {
+	cos, err := a.Store.AllCompanies()
+	if err != nil {
+		return false
+	}
+	ok := true
+	for _, co := range cos {
+		key := a.StripeKey(co)
+		if key == "" {
+			continue
+		}
+		if co.StripeWebhookID != "" {
+			if err := stripe.DeleteWebhook(ctx, key, co.StripeWebhookID); err != nil {
+				slog.Warn("stripe: old webhook not removed", "company", co.ID, "err", err)
+			}
+		}
+		var whID, whSecret string
+		if a.IsPublicHTTPS() {
+			whID, whSecret, err = stripe.CreateWebhook(ctx, key, a.BaseURL()+"/webhooks/stripe/"+co.PublicID)
+			if err != nil {
+				slog.Warn("stripe: webhook not created", "company", co.ID, "err", err)
+				ok = false
+			}
+		}
+		if err := a.Store.UpdateCompanyStripe(co.ID, co.StripeKey, a.Box.Seal(whSecret, aad(co, "stripe_whsec")), whID, co.StripeAccount); err != nil {
+			ok = false
+		}
+		a.Store.Audit(0, co.ID, "", "stripe.webhook_moved", a.BaseURL())
+	}
+	return ok
+}
+
+// RefreshWebhooksIfMoved runs RefreshStripeWebhooks once after the public
+// address changed (restore on another server), as soon as it is reachable.
+func (a *App) RefreshWebhooksIfMoved(ctx context.Context) {
+	if a.Store.Setting("stripe_webhooks_refresh") != "1" || !a.IsPublicHTTPS() {
+		return
+	}
+	if a.RefreshStripeWebhooks(ctx) {
+		a.Store.SetSetting("stripe_webhooks_refresh", "")
+	}
 }
 
 func (a *App) DisconnectStripe(ctx context.Context, co *store.Company) error {
