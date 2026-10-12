@@ -214,6 +214,7 @@ func (s *Server) Handler() http.Handler {
 	ca("POST /c/{cid}/settings/email/test", s.companyTestEmail)
 	ca("POST /c/{cid}/settings/stripe", s.companySaveStripe)
 	ca("POST /c/{cid}/settings/stripe/disconnect", s.companyStripeDisconnect)
+	ca("POST /c/{cid}/settings/stripe/cards", s.companySaveCards)
 	ca("POST /c/{cid}/settings/members", s.companySaveMembers)
 	ca("POST /c/{cid}/settings/archive", s.companyArchive)
 

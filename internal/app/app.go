@@ -530,7 +530,7 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	lk, _ := a.checkoutLocks.LoadOrStore(inv.ID, &sync.Mutex{})
 	lk.(*sync.Mutex).Lock()
 	defer lk.(*sync.Mutex).Unlock()
-	if ss, err := a.Store.ReusableStripeSession(inv.ID, inv.Due()); err == nil {
+	if ss, err := a.Store.ReusableStripeSession(inv.ID, inv.Due(), inv.AutoCharge || co.SaveCards); err == nil {
 		return ss.URL, nil
 	}
 	// sessions created for another amount must not stay payable
@@ -540,8 +540,9 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	email, customer := "", ""
 	if cl != nil {
 		email = cl.Email
-		if inv.AutoCharge {
-			// save the card for the next invoices of the recurring schedule
+		if inv.AutoCharge || co.SaveCards {
+			// save the card for the next invoices (of the recurring schedule,
+			// or any, when the company saves every card)
 			if sc, err := a.EnsureCustomer(ctx, co, cl); err == nil {
 				customer = sc.CustomerID
 			} else {
@@ -560,7 +561,8 @@ func (a *App) Checkout(ctx context.Context, co *store.Company, inv *store.Invoic
 	if err != nil {
 		return "", err
 	}
-	if err := a.Store.SaveStripeSession(store.StripeSession{ID: s.ID, InvoiceID: inv.ID, Amount: inv.Due(), URL: s.URL, ExpiresAt: s.ExpiresAt}); err != nil {
+	if err := a.Store.SaveStripeSession(store.StripeSession{ID: s.ID, InvoiceID: inv.ID, Amount: inv.Due(), URL: s.URL, ExpiresAt: s.ExpiresAt,
+		SavesCard: customer != ""}); err != nil {
 		return "", err
 	}
 	a.logStripe(co, inv, store.StripeLog{Event: "checkout.created", Ref: s.ID, Amount: inv.Due()})

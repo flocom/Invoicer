@@ -394,6 +394,18 @@ func (s *Server) companySaveStripe(c *Ctx) error {
 	return c.redirect(c.cpath("/settings?tab=payments"))
 }
 
+// companySaveCards chooses whether every online card payment saves the
+// client's card (to charge it later from the client or invoice page).
+func (s *Server) companySaveCards(c *Ctx) error {
+	on := c.form("save_cards") == "1"
+	if err := s.Store.SetSaveCards(c.Company.ID, on); err != nil {
+		return err
+	}
+	c.audit("company.settings", "save cards: "+strconv.FormatBool(on))
+	c.ok("flash.saved")
+	return c.redirect(c.cpath("/settings?tab=payments") + "#cards")
+}
+
 func (s *Server) companyStripeDisconnect(c *Ctx) error {
 	ctx, cancel := context.WithTimeout(c.R.Context(), 20*time.Second)
 	defer cancel()

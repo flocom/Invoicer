@@ -171,6 +171,13 @@
   <div class="form-actions"><button class="btn btn-primary" type="submit">{{if $d.StripeKeySet}}{{.T "settings.stripe_replace"}}{{else}}{{.T "settings.stripe_connect"}}{{end}}</button></div>
 </form>
 {{if $d.StripeKeySet}}
+<form method="post" action="{{.CPath "/settings/stripe/cards"}}" class="card stack" id="cards">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>{{.T "settings.cards_title"}}</h2>
+  <label class="check"><input type="checkbox" name="save_cards" value="1" {{if $c.SaveCards}}checked{{end}}> {{.T "settings.save_cards"}}</label>
+  <p class="hint indent">{{.T "settings.save_cards_hint"}}</p>
+  <div class="form-actions"><button class="btn" type="submit">{{.T "action.save"}}</button></div>
+</form>
 <form method="post" action="{{.CPath "/settings/stripe/disconnect"}}" class="card" data-confirm="{{.T "settings.stripe_disconnect_confirm"}}">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <button class="btn btn-danger-ghost" type="submit">{{.T "settings.stripe_disconnect"}}</button>
