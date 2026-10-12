@@ -576,20 +576,22 @@ type StripeSession struct {
 	Status    string
 	CreatedAt int64
 	ExpiresAt int64
+	SavesCard bool // the card paid with is kept for later charges
 }
 
 func (s *Store) SaveStripeSession(ss StripeSession) error {
-	_, err := s.DB.Exec(`INSERT INTO stripe_sessions(id, invoice_id, amount, url, status, created_at, expires_at) VALUES(?,?,?,?,?,?,?)`,
-		ss.ID, ss.InvoiceID, ss.Amount, ss.URL, "open", now(), ss.ExpiresAt)
+	_, err := s.DB.Exec(`INSERT INTO stripe_sessions(id, invoice_id, amount, url, status, created_at, expires_at, saves_card) VALUES(?,?,?,?,?,?,?,?)`,
+		ss.ID, ss.InvoiceID, ss.Amount, ss.URL, "open", now(), ss.ExpiresAt, b2i(ss.SavesCard))
 	return err
 }
 
-// ReusableStripeSession returns a still-valid open session for this amount.
-func (s *Store) ReusableStripeSession(invoiceID, amount int64) (*StripeSession, error) {
+// ReusableStripeSession returns a still-valid open session for this amount
+// that saves the card, or not, as wanted now.
+func (s *Store) ReusableStripeSession(invoiceID, amount int64, savesCard bool) (*StripeSession, error) {
 	var ss StripeSession
 	err := s.DB.QueryRow(`SELECT id, invoice_id, amount, url, status, created_at, expires_at FROM stripe_sessions
-		WHERE invoice_id = ? AND amount = ? AND status = 'open' AND expires_at > ? ORDER BY created_at DESC LIMIT 1`,
-		invoiceID, amount, now()+1800).Scan(&ss.ID, &ss.InvoiceID, &ss.Amount, &ss.URL, &ss.Status, &ss.CreatedAt, &ss.ExpiresAt)
+		WHERE invoice_id = ? AND amount = ? AND status = 'open' AND expires_at > ? AND saves_card = ? ORDER BY created_at DESC LIMIT 1`,
+		invoiceID, amount, now()+1800, b2i(savesCard)).Scan(&ss.ID, &ss.InvoiceID, &ss.Amount, &ss.URL, &ss.Status, &ss.CreatedAt, &ss.ExpiresAt)
 	if err != nil {
 		return nil, notFound(err)
 	}

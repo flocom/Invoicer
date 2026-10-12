@@ -391,4 +391,11 @@ CREATE INDEX stripe_log_invoice ON stripe_log(invoice_id);
 	`
 ALTER TABLE recurring ADD COLUMN lang TEXT NOT NULL DEFAULT '';
 `,
+	// 12 — save the client's card on every online payment, not only for
+	// automatically charged recurring invoices
+	`
+ALTER TABLE companies ADD COLUMN save_cards INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE stripe_sessions ADD COLUMN saves_card INTEGER NOT NULL DEFAULT 0;
+UPDATE stripe_sessions SET saves_card = 1 WHERE invoice_id IN (SELECT id FROM invoices WHERE auto_charge = 1);
+`,
 }

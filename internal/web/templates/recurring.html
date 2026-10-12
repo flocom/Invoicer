@@ -11,7 +11,7 @@
   <tbody>
   {{range .Data}}
   <tr class="{{if not .Active}}is-archived{{end}}">
-    <td><a class="row-link" href="{{$.CPath "/recurring/%d" .ID}}"><strong>{{.Name}}</strong></a>{{if .LastError}}<div class="danger small">{{.LastError}}</div>{{end}}</td>
+    <td><a class="row-link row-link-plain" href="{{$.CPath "/recurring/%d" .ID}}">{{.Name}}</a>{{if .LastError}}<div class="danger small">{{.LastError}}</div>{{end}}</td>
     <td>{{.ClientName}}</td>
     <td>{{if eq .IntervalCount 1}}{{$.TS "every1." .IntervalUnit}}{{else}}{{$.T (printf "everyN.%s" .IntervalUnit) .IntervalCount}}{{end}}</td>
     <td class="nowrap">{{if .Active}}{{$.Date .NextRun}}{{else}}–{{end}}</td>
