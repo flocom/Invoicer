@@ -209,7 +209,9 @@ func (s *Server) publicCard(c *Ctx) error {
 	}
 	if card != nil {
 		brand := strings.ToUpper(card.Brand)
-		if brand == "" {
+		if card.IsLink() {
+			brand = "LINK"
+		} else if brand == "" {
 			brand = "CARD"
 		}
 		d["Brand"], d["Expired"] = brand, card.Expired(s.App.Today())

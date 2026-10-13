@@ -580,6 +580,7 @@ body.bare { background: radial-gradient(1100px 520px at 50% -140px, #e6e8ff 0%, 
 .cc-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .12em; opacity: .7; }
 .cc-value { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cc-exp { text-align: right; }
+.cc-link { font-size: 1.05rem; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; }
 .cc-expired { filter: grayscale(.85); opacity: .8; }
 .cc-empty { color: var(--muted); background: var(--surface-2); border: 2px dashed var(--border-strong); box-shadow: none; align-items: center; justify-content: center; }
 .cc-empty::after { display: none; }

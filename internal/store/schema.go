@@ -398,4 +398,10 @@ ALTER TABLE companies ADD COLUMN save_cards INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE stripe_sessions ADD COLUMN saves_card INTEGER NOT NULL DEFAULT 0;
 UPDATE stripe_sessions SET saves_card = 1 WHERE invoice_id IN (SELECT id FROM invoices WHERE auto_charge = 1);
 `,
+	// 13 — saved payment methods that are not cards (Stripe Link): their
+	// type and the e-mail of the Link account
+	`
+ALTER TABLE client_cards ADD COLUMN method_type TEXT NOT NULL DEFAULT 'card';
+ALTER TABLE client_cards ADD COLUMN email TEXT NOT NULL DEFAULT '';
+`,
 }

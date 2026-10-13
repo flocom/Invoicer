@@ -320,10 +320,16 @@ func CreateCustomer(ctx context.Context, key, name, email string, metadata map[s
 }
 
 // Card is a saved card payment method.
+// Card is a saved payment method: a card, or a Stripe Link wallet (which
+// shows no card details, only the e-mail of the Link account).
 type Card struct {
 	ID       string `json:"id"`
+	Type     string `json:"type"` // card, link
 	Customer string `json:"customer"`
-	Card     struct {
+	Link     struct {
+		Email string `json:"email"`
+	} `json:"link"`
+	Card struct {
 		Brand    string `json:"brand"`
 		Last4    string `json:"last4"`
 		ExpMonth int    `json:"exp_month"`
@@ -355,7 +361,23 @@ func expandedCard(raw json.RawMessage) *Card {
 	if len(raw) == 0 || raw[0] != '{' || json.Unmarshal(raw, &c) != nil || c.ID == "" {
 		return nil
 	}
+	if c.Type == "" {
+		c.Type = "card"
+	}
 	return &c
+}
+
+// GetPaymentMethod fetches a saved payment method.
+func GetPaymentMethod(ctx context.Context, key, id string) (*Card, error) {
+	var raw json.RawMessage
+	if err := call(ctx, key, http.MethodGet, "/v1/payment_methods/"+url.PathEscape(id), nil, &raw); err != nil {
+		return nil, err
+	}
+	c := expandedCard(raw)
+	if c == nil {
+		return nil, errors.New("unknown payment method")
+	}
+	return c, nil
 }
 
 // ChargeParams describes an off-session payment with a saved card.
@@ -364,6 +386,7 @@ type ChargeParams struct {
 	Currency       string
 	Customer       string
 	PaymentMethod  string
+	MethodType     string // type of the payment method: card (default) or link
 	Description    string
 	Metadata       map[string]string
 	IdempotencyKey string
@@ -377,7 +400,10 @@ func Charge(ctx context.Context, key string, p ChargeParams) (*PaymentIntent, er
 	f.Set("currency", strings.ToLower(p.Currency))
 	f.Set("customer", p.Customer)
 	f.Set("payment_method", p.PaymentMethod)
-	f.Set("payment_method_types[0]", "card")
+	if p.MethodType == "" {
+		p.MethodType = "card"
+	}
+	f.Set("payment_method_types[0]", p.MethodType)
 	f.Set("off_session", "true")
 	f.Set("confirm", "true")
 	if p.Description != "" {

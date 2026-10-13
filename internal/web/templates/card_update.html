@@ -14,10 +14,11 @@
     {{if $d.Card}}
     <div class="cc{{if $d.Expired}} cc-expired{{end}}" aria-label="{{$d.Card.Label}}">
       <div class="cc-top"><span class="cc-chip"></span><span class="cc-brand">{{$d.Brand}}</span></div>
-      <div class="cc-number">•••• •••• •••• {{$d.Card.Last4}}</div>
+      {{if $d.Card.IsLink}}<div class="cc-number cc-link">{{if $d.Card.Email}}{{$d.Card.Email}}{{else}}Stripe Link{{end}}</div>
+      {{else}}<div class="cc-number">•••• •••• •••• {{if $d.Card.Last4}}{{$d.Card.Last4}}{{else}}••••{{end}}</div>{{end}}
       <div class="cc-bottom">
         <div><span class="cc-label">{{.T "card.public_holder"}}</span><span class="cc-value">{{$d.Client.Name}}</span></div>
-        <div class="cc-exp"><span class="cc-label">{{.T "card.public_expires"}}</span><span class="cc-value">{{$d.Expiry}}</span></div>
+        {{if $d.Card.ExpYear}}<div class="cc-exp"><span class="cc-label">{{.T "card.public_expires"}}</span><span class="cc-value">{{$d.Expiry}}</span></div>{{end}}
       </div>
     </div>
     <div class="cardpage-status {{if $d.Expired}}is-expired{{else}}is-active{{end}}"><span class="dot"></span>{{if $d.Expired}}{{.T "card.public_expired"}}{{else}}{{.T "card.public_active"}}{{end}}</div>

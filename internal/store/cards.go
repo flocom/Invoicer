@@ -65,28 +65,54 @@ type SavedCard struct {
 	ExpYear       int
 	Default       bool
 	CreatedAt     int64
+	Type          string // card, link (Stripe Link: no card details)
+	Email         string // Link account
 }
 
-// Label is a short human description, e.g. "Visa •••• 4242 (04/2028)".
+// IsLink tells a Stripe Link wallet, which shows no card details.
+func (c *SavedCard) IsLink() bool { return c.Type == "link" }
+
+// Incomplete tells a card saved without its details (to read again from Stripe).
+func (c *SavedCard) Incomplete() bool { return !c.IsLink() && c.Last4 == "" }
+
+// Label is a short human description, e.g. "Visa •••• 4242 (04/2028)" or
+// "Link (jane@example.com)".
 func (c *SavedCard) Label() string {
+	if c.IsLink() {
+		if c.Email != "" {
+			return "Link (" + c.Email + ")"
+		}
+		return "Link"
+	}
 	brand := c.Brand
 	if brand == "" {
 		brand = "card"
 	}
-	return fmt.Sprintf("%s •••• %s (%02d/%d)", strings.ToUpper(brand[:1])+brand[1:], c.Last4, c.ExpMonth, c.ExpYear)
+	brand = strings.ToUpper(brand[:1]) + brand[1:]
+	if c.Last4 == "" {
+		return brand
+	}
+	if c.ExpYear == 0 {
+		return brand + " •••• " + c.Last4
+	}
+	return fmt.Sprintf("%s •••• %s (%02d/%d)", brand, c.Last4, c.ExpMonth, c.ExpYear)
 }
 
-// Expired reports whether the card expired before the given ISO date.
+// Expired reports whether the card expired before the given ISO date
+// (never for a Link wallet or a card whose expiry is unknown).
 func (c *SavedCard) Expired(today string) bool {
+	if c.ExpYear == 0 {
+		return false
+	}
 	return fmt.Sprintf("%04d-%02d", c.ExpYear, c.ExpMonth) < today[:min(7, len(today))]
 }
 
-const cardCols = `id, company_id, client_id, payment_method, brand, last4, exp_month, exp_year, is_default, created_at`
+const cardCols = `id, company_id, client_id, payment_method, brand, last4, exp_month, exp_year, is_default, created_at, method_type, email`
 
 func scanCard(row interface{ Scan(...any) error }) (*SavedCard, error) {
 	c := &SavedCard{}
 	if err := row.Scan(&c.ID, &c.CompanyID, &c.ClientID, &c.PaymentMethod, &c.Brand, &c.Last4, &c.ExpMonth, &c.ExpYear, &c.Default,
-		&c.CreatedAt); err != nil {
+		&c.CreatedAt, &c.Type, &c.Email); err != nil {
 		return nil, notFound(err)
 	}
 	return c, nil
@@ -99,12 +125,41 @@ func (s *Store) SaveCard(c *SavedCard) error {
 		if _, err := tx.Exec(`UPDATE client_cards SET is_default = 0 WHERE company_id = ? AND client_id = ?`, c.CompanyID, c.ClientID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`INSERT INTO client_cards(company_id, client_id, payment_method, brand, last4, exp_month, exp_year, is_default, created_at)
-			VALUES(?,?,?,?,?,?,?,1,?) ON CONFLICT(company_id, payment_method) DO UPDATE SET client_id = excluded.client_id,
-			brand = excluded.brand, last4 = excluded.last4, exp_month = excluded.exp_month, exp_year = excluded.exp_year, is_default = 1`,
-			c.CompanyID, c.ClientID, c.PaymentMethod, c.Brand, c.Last4, c.ExpMonth, c.ExpYear, now())
+		if c.Type == "" {
+			c.Type = "card"
+		}
+		_, err := tx.Exec(`INSERT INTO client_cards(company_id, client_id, payment_method, brand, last4, exp_month, exp_year, is_default, created_at,
+			method_type, email) VALUES(?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(company_id, payment_method) DO UPDATE SET client_id = excluded.client_id,
+			brand = excluded.brand, last4 = excluded.last4, exp_month = excluded.exp_month, exp_year = excluded.exp_year, is_default = 1,
+			method_type = excluded.method_type, email = excluded.email`,
+			c.CompanyID, c.ClientID, c.PaymentMethod, c.Brand, c.Last4, c.ExpMonth, c.ExpYear, now(), c.Type, c.Email)
 		return err
 	})
+}
+
+// UpdateCardDetails stores the details read again from Stripe.
+func (s *Store) UpdateCardDetails(c *SavedCard) error {
+	_, err := s.DB.Exec(`UPDATE client_cards SET brand = ?, last4 = ?, exp_month = ?, exp_year = ?, method_type = ?, email = ? WHERE id = ?`,
+		c.Brand, c.Last4, c.ExpMonth, c.ExpYear, c.Type, c.Email, c.ID)
+	return err
+}
+
+// IncompleteCards lists saved cards whose details are missing.
+func (s *Store) IncompleteCards(limit int) ([]*SavedCard, error) {
+	rows, err := s.DB.Query(`SELECT `+cardCols+` FROM client_cards WHERE method_type = 'card' AND last4 = '' ORDER BY id LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*SavedCard
+	for rows.Next() {
+		c, err := scanCard(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) Cards(companyID, clientID int64) ([]*SavedCard, error) {
