@@ -99,8 +99,8 @@ func (a *App) ApplySetupSession(ctx context.Context, co *store.Company, s *strip
 }
 
 func (a *App) saveCard(co *store.Company, clientID int64, c *stripe.Card) error {
-	sc := &store.SavedCard{CompanyID: co.ID, ClientID: clientID, PaymentMethod: c.ID, Brand: c.Card.Brand, Last4: c.Card.Last4,
-		ExpMonth: c.Card.ExpMonth, ExpYear: c.Card.ExpYear}
+	sc := &store.SavedCard{CompanyID: co.ID, ClientID: clientID, PaymentMethod: c.ID}
+	fillCard(sc, c)
 	if err := a.Store.SaveCard(sc); err != nil {
 		return err
 	}
@@ -108,6 +108,34 @@ func (a *App) saveCard(co *store.Company, clientID int64, c *stripe.Card) error 
 	a.logStripe(co, nil, store.StripeLog{ClientID: clientID, Event: "card.saved", Level: "ok", Ref: c.ID, Detail: sc.Label()})
 	return nil
 }
+
+// fillCard copies what Stripe tells about a payment method.
+func fillCard(sc *store.SavedCard, c *stripe.Card) {
+	sc.Type, sc.Email = c.Type, c.Link.Email
+	sc.Brand, sc.Last4, sc.ExpMonth, sc.ExpYear = c.Card.Brand, c.Card.Last4, c.Card.ExpMonth, c.Card.ExpYear
+}
+
+// completeCard reads again from Stripe a card saved without its details
+// (before Stripe Link wallets were told apart from cards).
+func (a *App) completeCard(ctx context.Context, co *store.Company, card *store.SavedCard) {
+	if !card.Incomplete() {
+		return
+	}
+	if _, tried := a.cardRepairs.LoadOrStore(card.ID, true); tried && ctx.Value(forceRepair{}) == nil {
+		return
+	}
+	pm, err := stripe.GetPaymentMethod(ctx, a.StripeKey(co), card.PaymentMethod)
+	if err != nil {
+		slog.Warn("stripe: cannot read saved card", "card", card.ID, "err", err)
+		return
+	}
+	fillCard(card, pm)
+	if err := a.Store.UpdateCardDetails(card); err != nil {
+		slog.Warn("cannot update card", "card", card.ID, "err", err)
+	}
+}
+
+type forceRepair struct{}
 
 // saveCheckoutCard keeps the card used to pay an invoice when Checkout saved
 // it on the client's customer (auto-charged recurring invoices).
@@ -145,6 +173,7 @@ func (a *App) ChargeInvoice(ctx context.Context, co *store.Company, inv *store.I
 	if err != nil {
 		return nil, errors.New("the client has no Stripe customer")
 	}
+	a.completeCard(context.WithValue(ctx, forceRepair{}, true), co, card)
 	// one payment at a time per invoice (also excludes a concurrent Checkout)
 	lk, _ := a.checkoutLocks.LoadOrStore(inv.ID, &sync.Mutex{})
 	lk.(*sync.Mutex).Lock()
@@ -162,7 +191,7 @@ func (a *App) ChargeInvoice(ctx context.Context, co *store.Company, inv *store.I
 	}
 	lang := i18n.Norm(inv.Lang)
 	pi, err := stripe.Charge(ctx, a.StripeKey(co), stripe.ChargeParams{
-		Amount: inv.Due(), Currency: inv.Currency, Customer: sc.CustomerID, PaymentMethod: card.PaymentMethod,
+		Amount: inv.Due(), Currency: inv.Currency, Customer: sc.CustomerID, PaymentMethod: card.PaymentMethod, MethodType: card.Type,
 		Description:    i18n.T(lang, "pdf.invoice") + " " + inv.Number,
 		Metadata:       map[string]string{"invoicer_invoice": strconv.FormatInt(inv.ID, 10), "invoicer_company": co.PublicID, "invoice_number": inv.Number},
 		IdempotencyKey: "invoicer-charge-" + co.PublicID + "-" + strconv.FormatInt(ch.ID, 10),
@@ -260,6 +289,13 @@ func (a *App) ReconcileCards(ctx context.Context) {
 			}
 			if err := a.applyCharge(ctx, co, inv, ch, pi); errors.Is(err, ErrChargeFailed) && ch.Automatic {
 				a.chargeFailed(ctx, co, inv, ch)
+			}
+		}
+	}
+	if cards, err := a.Store.IncompleteCards(20); err == nil {
+		for _, card := range cards {
+			if co, err := a.Store.Company(card.CompanyID); err == nil && co.HasStripe() {
+				a.completeCard(ctx, co, card)
 			}
 		}
 	}

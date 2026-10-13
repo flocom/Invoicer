@@ -43,6 +43,7 @@ type App struct {
 	checkoutLocks  sync.Map // invoice id → *sync.Mutex
 	customerLocks  sync.Map // "company:client" → *sync.Mutex
 	recurringLocks sync.Map // schedule id → *sync.Mutex
+	cardRepairs    sync.Map // card id → tried to read its details again
 }
 
 func New(cfg config.Config, st *store.Store, box *security.Box, up *updater.Updater) *App {

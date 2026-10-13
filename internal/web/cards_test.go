@@ -78,6 +78,13 @@ func newFakeAPIs(t *testing.T) *fakeAPIs {
 			}
 			fmt.Fprintf(w, `{"id":"pi_%d","status":"succeeded","amount":%s,"amount_received":%s,"currency":%q}`,
 				len(f.charges), r.PostForm.Get("amount"), r.PostForm.Get("amount"), r.PostForm.Get("currency"))
+		case strings.HasPrefix(p, "/v1/payment_methods/") && r.Method == "GET":
+			id := strings.TrimPrefix(p, "/v1/payment_methods/")
+			if strings.HasPrefix(id, "pm_link") {
+				fmt.Fprintf(w, `{"id":%q,"type":"link","customer":"cus_1","link":{"email":"jane@globex.test"}}`, id)
+				return
+			}
+			io.WriteString(w, card(id))
 		case strings.HasSuffix(p, "/detach"):
 			io.WriteString(w, `{}`)
 		default:
