@@ -25,7 +25,7 @@ Multi-company · Stripe & bank transfers · Recurring invoices · EN / FR · One
 
 ## ✨ Why Invoicer?
 
-- **Get paid faster.** Every invoice comes with a branded payment page: your client pays by card in two clicks (Stripe) or by bank transfer with a ready-to-scan SEPA QR code. Payments are detected automatically and a receipt goes out by itself.
+- **Get paid faster.** Every invoice comes with a branded payment page: your client pays by card in two clicks (Stripe) or by bank transfer. Payments are detected automatically and a receipt goes out by itself.
 - **Stop chasing clients.** Polite reminders before, on and after the due date are sent for you, in your client's language.
 - **Subscriptions on autopilot.** Recurring invoices are generated, numbered and e-mailed on schedule — weekly, monthly, quarterly, yearly.
 - **All your businesses, one place.** Run several companies side by side, each with its own branding, numbering, bank details, Resend and Stripe accounts.
@@ -69,7 +69,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 - Stripe webhook set up automatically — no copy-pasting secrets
 - **You are told by e-mail** (at the company's address) when a card payment goes through or an automatic charge is declined; a **Stripe log** shows every payment link, payment, charge and webhook
 - Several bank accounts per company (one per currency or more); each invoice shows the account in its currency, or the one you pick, or none
-- Bank transfer details + **SEPA QR code** on EUR invoices, optionally included in e-mails
+- Bank transfer details on invoices, the payment page and e-mails
 - Automatic receipts, overdue tracking, dashboards
 
 </td>
