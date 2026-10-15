@@ -452,12 +452,12 @@ func formatIBAN(s string) string {
 
 // paymentQR returns the QR code printed next to the payment details and the
 // key of its caption: the online payment page when card payment is offered,
-// otherwise a SEPA transfer (EUR only), or nil.
+// or nil (bank transfers get no QR code).
 func paymentQR(in Input) ([]byte, string) {
 	if code := urlQR(in.PayURL); code != nil {
 		return code, "pdf.scan_to_pay_online"
 	}
-	return epcQR(in.Bank, in.Invoice, in.Seller.Name), "pdf.scan_to_pay"
+	return nil, ""
 }
 
 // urlQR encodes a payment link (nil when there is none).
@@ -466,29 +466,6 @@ func urlQR(link string) []byte {
 		return nil
 	}
 	code, err := qr.Encode(link, qr.M)
-	if err != nil {
-		return nil
-	}
-	return code.PNG()
-}
-
-// epcQR builds a SEPA credit transfer QR code (EPC069-12) for EUR invoices,
-// understood by most European banking apps.
-func epcQR(bank *store.BankAccount, inv *store.Invoice, sellerName string) []byte {
-	if bank == nil {
-		return nil
-	}
-	iban := strings.ToUpper(strings.ReplaceAll(bank.IBAN, " ", ""))
-	if inv.Currency != "EUR" || bank.Currency != "EUR" || iban == "" || inv.Due() <= 0 || inv.Due() > 99999999999 {
-		return nil
-	}
-	name := firstNonEmpty(bank.Holder, sellerName)
-	if len([]rune(name)) > 70 {
-		name = string([]rune(name)[:70])
-	}
-	payload := strings.Join([]string{"BCD", "002", "1", "SCT", strings.ToUpper(strings.ReplaceAll(bank.BIC, " ", "")), name, iban,
-		"EUR" + money.Input(inv.Due(), 2, true), "", "", inv.Number}, "\n")
-	code, err := qr.Encode(payload, qr.M)
 	if err != nil {
 		return nil
 	}

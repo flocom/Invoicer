@@ -50,13 +50,9 @@ func TestPaymentQR(t *testing.T) {
 	if !bytes.Equal(must(paymentQR(in)), urlQR(in.PayURL)) {
 		t.Fatal("QR should encode the pay link")
 	}
-	in.PayURL = "" // card payment not offered: SEPA transfer
-	if code, key := paymentQR(in); code == nil || key != "pdf.scan_to_pay" {
-		t.Fatalf("without a pay link: %v %s", code != nil, key)
-	}
-	in.Bank = nil
+	in.PayURL = "" // card payment not offered: no SEPA transfer QR code
 	if code, _ := paymentQR(in); code != nil {
-		t.Fatal("no QR without pay link nor bank")
+		t.Fatal("bank transfers must not get a QR code")
 	}
 }
 
