@@ -81,7 +81,7 @@ func (s *Server) recurringForm(c *Ctx) error {
 		today := s.App.Today()
 		t, _ := time.Parse("2006-01-02", today)
 		d.R = &store.Recurring{Currency: co.DefaultCurrency, IntervalUnit: "month", IntervalCount: 1, NextRun: today, AnchorDay: t.Day(),
-			Remaining: -1, DueDays: co.PaymentTermsDays, AutoSend: co.HasResend(), Active: true, Notes: co.DefaultNotes, CardPayment: true,
+			Remaining: -1, DueDays: co.PaymentTermsDays, AutoSend: co.HasResend(), Active: true, Notes: co.DefaultNotes, CardPayment: true, PayPalPayment: true,
 			Lines: []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}}
 		if cid, _ := strconv.ParseInt(c.R.URL.Query().Get("client"), 10, 64); cid != 0 {
 			if cl, err := s.Store.Client(co.ID, cid); err == nil {
@@ -112,7 +112,7 @@ func (s *Server) recurringForm(c *Ctx) error {
 // starts one month after the invoice (the invoice is the first period).
 func (s *Server) recurringFromInvoice(r *store.Recurring, inv *store.Invoice, today string) {
 	r.ClientID, r.Currency, r.Lang, r.Notes = inv.ClientID, inv.Currency, inv.Lang, inv.Notes
-	r.BankAccountID, r.CardPayment = inv.BankAccountID, inv.CardPayment
+	r.BankAccountID, r.CardPayment, r.PayPalPayment = inv.BankAccountID, inv.CardPayment, inv.PayPalPayment
 	r.Lines = nil
 	for _, l := range inv.Lines {
 		r.Lines = append(r.Lines, store.Line{Description: l.Description, Quantity: l.Quantity, UnitPrice: l.UnitPrice, TaxBP: l.TaxBP})
@@ -198,6 +198,7 @@ func (s *Server) recurringSave(c *Ctx) error {
 	}
 	r.BankAccountID = s.bankChoice(c)
 	r.CardPayment = c.form("card_payment") == "1"
+	r.PayPalPayment = c.form("paypal_payment") == "1"
 	r.AutoCharge = r.CardPayment && c.form("auto_charge") == "1"
 	if v := c.form("remaining"); v == "" {
 		r.Remaining = -1

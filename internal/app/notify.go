@@ -25,6 +25,7 @@ type ownerNote struct {
 	Card           string // saved card label, for card charges
 	Reason         string // why a charge failed
 	ClientNotified bool   // the client was e-mailed about the failure
+	Via            string // "paypal" for a PayPal payment
 	IdempotencyKey string
 }
 
@@ -42,7 +43,7 @@ func (a *App) notifyOwner(ctx context.Context, co *store.Company, inv *store.Inv
 	}
 	subject, html, text := mailer.Render(mailer.Content{Lang: lang, Kind: n.Kind, CompanyName: co.DisplayName(), Accent: co.AccentColor,
 		ClientName: inv.ClientName, Number: inv.Number, Amount: money.Format(n.Amount, inv.Currency, lang), Card: n.Card, Message: n.Reason,
-		ClientNotified: n.ClientNotified, Link: link})
+		ClientNotified: n.ClientNotified, Via: n.Via, Link: link})
 	id, err := mailer.Send(ctx, a.ResendKey(co), mailer.Message{From: co.EmailFrom, To: []string{to}, Subject: subject, HTML: html, Text: text,
 		IdempotencyKey: n.IdempotencyKey})
 	log := store.EmailLog{CompanyID: co.ID, InvoiceID: inv.ID, Kind: n.Kind, To: to, Subject: subject, Status: "sent", ProviderID: id, HTML: html, Text: text}

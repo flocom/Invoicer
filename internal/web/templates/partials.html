@@ -182,6 +182,9 @@
   <div><label class="check muted"><input type="checkbox" disabled> {{$p.T "pay.card"}}</label>
     <p class="hint">{{$p.T "pay.card_unavailable"}}{{if $p.User.IsAdmin}} <a href="{{$p.CPath "/settings?tab=payments"}}">{{$p.T "action.configure"}}</a>{{end}}</p></div>
   {{end}}
+  {{if $p.Company.HasPayPal}}
+  <label class="check"><input type="checkbox" name="paypal_payment" value="1" {{if .PayPal}}checked{{end}}> {{$p.T "pay.paypal"}}</label>
+  {{else}}<input type="hidden" name="paypal_payment" value="{{if .PayPal}}1{{end}}">{{end}}
   <div class="field"><label for="bank_account">{{$p.T "pay.transfer"}}</label>
     {{if .Banks}}{{template "bankselect" (dict "P" $p "Banks" .Banks "Sel" .Sel "ID" "bank_account")}}
     <p class="hint">{{$p.T "bank.choice_hint"}}</p>

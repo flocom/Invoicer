@@ -26,6 +26,7 @@ type Content struct {
 	Card        string // saved card label (charge_failed, owner notifications)
 	// owner notifications: ClientName is the payer, Message the failure reason
 	ClientNotified bool
+	Via            string // owner_paid: "paypal" for a PayPal payment
 	Message        string // optional custom message from the sender
 	Bank           [][2]string
 }
@@ -121,6 +122,9 @@ func Render(c Content) (subject, html, text string) {
 		v.Paragraphs = []string{t("mail.hello"), t("mail.owner_paid.body", c.ClientName, c.Number)}
 		if c.Card != "" {
 			v.Paragraphs[1] = t("mail.owner_paid.card", c.Card, c.Number, c.ClientName)
+		}
+		if c.Via == "paypal" {
+			v.Paragraphs[1] = t("mail.owner_paid.paypal", c.ClientName, c.Number)
 		}
 		v.AmountLabel = t("mail.amount_paid")
 		v.DueDate = ""

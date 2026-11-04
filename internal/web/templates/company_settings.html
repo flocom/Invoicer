@@ -183,6 +183,35 @@
   <button class="btn btn-danger-ghost" type="submit">{{.T "settings.stripe_disconnect"}}</button>
 </form>
 {{end}}
+<form method="post" action="{{.CPath "/settings/paypal"}}" class="card stack" id="paypal" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>PayPal</h2>
+  <p class="hint">{{.T "settings.paypal_intro"}}</p>
+  {{if $c.HasPayPal}}<p class="status-line ok">{{template "icon" "check"}}{{if $c.PayPalSandbox}}{{.T "settings.paypal_connected_sandbox"}}{{else}}{{.T "settings.paypal_connected"}}{{end}}</p>
+  {{if $c.PayPalWebhookID}}<p class="status-line ok">{{template "icon" "check"}}{{.T "settings.paypal_webhook_active"}}</p>
+  {{else}}<p class="status-line warn">{{template "icon" "bell"}}{{.T "settings.paypal_webhook_inactive"}}</p>{{end}}{{end}}
+  <div class="field"><label for="paypal_client_id">{{.T "settings.paypal_client_id"}}</label>
+    <input id="paypal_client_id" name="paypal_client_id" required spellcheck="false" class="mono" value="{{$c.PayPalClientID}}" maxlength="200"></div>
+  <div class="field"><label for="paypal_secret">{{.T "settings.paypal_secret"}}</label>
+    <input id="paypal_secret" name="paypal_secret" type="password" {{if not $c.HasPayPal}}required{{end}} autocomplete="new-password" spellcheck="false" class="mono" maxlength="200" placeholder="{{if $c.HasPayPal}}••••••••••••  ({{.T "settings.key_saved"}}){{end}}"></div>
+  <label class="check"><input type="checkbox" name="paypal_card" value="1" {{if or $c.PayPalCard (not $c.HasPayPal)}}checked{{end}}> {{.T "settings.paypal_card"}}</label>
+  <p class="hint indent">{{.T "settings.paypal_card_hint"}}</p>
+  <details class="stripe-perms" {{if not $c.HasPayPal}}open{{end}}>
+    <summary>{{.T "settings.paypal_howto_title"}}</summary>
+    <ol class="steps small">
+      <li>{{.T "settings.paypal_step1"}}</li>
+      <li>{{.T "settings.paypal_step2"}}</li>
+      <li>{{.T "settings.paypal_step3"}}</li>
+    </ol>
+  </details>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{if $c.HasPayPal}}{{.T "action.save"}}{{else}}{{.T "settings.paypal_connect"}}{{end}}</button></div>
+</form>
+{{if $c.HasPayPal}}
+<form method="post" action="{{.CPath "/settings/paypal/disconnect"}}" class="card" data-confirm="{{.T "settings.paypal_disconnect_confirm"}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <button class="btn btn-danger-ghost" type="submit">{{.T "settings.paypal_disconnect"}}</button>
+</form>
+{{end}}
 <div class="card stack" id="banks">
   <h2>{{.T "settings.bank_accounts"}}</h2>
   <p class="hint">{{.T "settings.bank_accounts_hint"}}</p>

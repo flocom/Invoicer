@@ -394,6 +394,39 @@ func (s *Server) companySaveStripe(c *Ctx) error {
 	return c.redirect(c.cpath("/settings?tab=payments"))
 }
 
+// companySavePayPal connects the company's PayPal app (checked with PayPal).
+func (s *Server) companySavePayPal(c *Ctx) error {
+	back := c.cpath("/settings?tab=payments") + "#paypal"
+	ctx, cancel := context.WithTimeout(c.R.Context(), 30*time.Second)
+	defer cancel()
+	warning, err := s.App.ConfigurePayPal(ctx, c.Company, c.form("paypal_client_id"), c.R.PostFormValue("paypal_secret"), c.form("paypal_card") == "1")
+	if err != nil {
+		c.flash("err", err.Error())
+		return c.redirect(back)
+	}
+	c.audit("company.settings", "paypal connected")
+	switch {
+	case warning == "no_public_https":
+		c.flash("info", c.t("settings.paypal_saved")+" "+c.t("settings.paypal_polling"))
+	case warning != "":
+		c.flash("info", c.t("settings.paypal_saved")+" — "+warning)
+	default:
+		c.ok("settings.paypal_saved")
+	}
+	return c.redirect(back)
+}
+
+func (s *Server) companyPayPalDisconnect(c *Ctx) error {
+	ctx, cancel := context.WithTimeout(c.R.Context(), 20*time.Second)
+	defer cancel()
+	if err := s.App.DisconnectPayPal(ctx, c.Company); err != nil {
+		return err
+	}
+	c.audit("company.settings", "paypal disconnected")
+	c.ok("flash.saved")
+	return c.redirect(c.cpath("/settings?tab=payments"))
+}
+
 // companySaveCards chooses whether every online card payment saves the
 // client's card (to charge it later from the client or invoice page).
 func (s *Server) companySaveCards(c *Ctx) error {

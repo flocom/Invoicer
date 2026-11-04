@@ -89,7 +89,7 @@ func TestOwnerPaymentNotificationsAndStripeLog(t *testing.T) {
 	b.get("/c/1/invoices/1")
 	b.must("Payment link created")
 	b.must("Card payment received")
-	b.must("Full Stripe log")
+	b.must("Full payments log")
 	b.get("/c/1/stripe-log")
 	b.must("Webhook received")
 	b.must("checkout.session.completed")

@@ -3,12 +3,15 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/flocom/invoicer/internal/app"
 	"github.com/flocom/invoicer/internal/i18n"
+	"github.com/flocom/invoicer/internal/paypal"
 	"github.com/flocom/invoicer/internal/store"
 	"github.com/flocom/invoicer/internal/stripe"
 )
@@ -42,9 +45,11 @@ func (s *Server) publicInvoice(c *Ctx) error {
 	c.Company = nil
 	p := s.page(c, i18n.T(c.Lang, "pdf.invoice")+" "+inv.Number, "", map[string]any{
 		"Invoice": inv, "Co": co, "Seller": inv.Seller(), "Buyer": inv.Buyer(), "TaxGroups": store.TaxGroups(inv.Lines),
-		"CanPay": inv.CardPayable(co),
-		"Bank":   s.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency),
-		"Paid":   c.R.URL.Query().Get("paid") == "1", "Token": inv.PublicToken, "HasLogo": len(co.Logo) > 0,
+		"CanPay": inv.CardPayable(co), "CanPayPal": inv.PayPalPayable(co),
+		"PayPalCard":  inv.PayPalPayable(co) && co.PayPalCard && !inv.CardPayable(co),
+		"PayPalIssue": map[string]string{"changed": "changed", "declined": "declined", "error": "error"}[c.R.URL.Query().Get("paypal")],
+		"Bank":        s.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency),
+		"Paid":        c.R.URL.Query().Get("paid") == "1", "Token": inv.PublicToken, "HasLogo": len(co.Logo) > 0,
 	})
 	p.Bare = true
 	c.W.Header().Set("X-Robots-Tag", "noindex, nofollow")
@@ -87,6 +92,111 @@ func (s *Server) publicPay(c *Ctx) error {
 	}
 	http.Redirect(c.W, c.R, url, http.StatusSeeOther)
 	return nil
+}
+
+// publicPayPal creates a PayPal order and sends the client to PayPal's page,
+// on their PayPal account, or on the card form with ?card=1.
+func (s *Server) publicPayPal(c *Ctx) error {
+	inv, co, err := s.publicLoad(c)
+	if err != nil {
+		return err
+	}
+	if !s.limiter.allow("pay:"+inv.PublicToken, 10, 10*time.Minute) {
+		s.renderError(c, http.StatusTooManyRequests, "err.rate_limited")
+		return nil
+	}
+	if !inv.PayPalPayable(co) {
+		http.Redirect(c.W, c.R, "/i/"+inv.PublicToken, http.StatusSeeOther)
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), 25*time.Second)
+	defer cancel()
+	url, err := s.App.PayPalCheckout(ctx, co, inv, c.R.URL.Query().Get("card") == "1")
+	if err != nil {
+		slog.Error("paypal checkout", "invoice", inv.ID, "err", err)
+		c.Lang = i18n.Norm(inv.Lang)
+		s.renderError(c, http.StatusBadGateway, "err.checkout")
+		return nil
+	}
+	http.Redirect(c.W, c.R, url, http.StatusSeeOther)
+	return nil
+}
+
+// publicPayPalReturn is where PayPal sends the client back after approving
+// the payment: the order is captured now.
+func (s *Server) publicPayPalReturn(c *Ctx) error {
+	inv, co, err := s.publicLoad(c)
+	if err != nil {
+		return err
+	}
+	back := "/i/" + inv.PublicToken
+	orderID := c.R.URL.Query().Get("token") // PayPal's name for the order id
+	if known, err := s.Store.PayPalOrder(orderID); err != nil || known.InvoiceID != inv.ID {
+		http.Redirect(c.W, c.R, back, http.StatusSeeOther)
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), 30*time.Second)
+	defer cancel()
+	paid, err := s.App.ApplyPayPalOrder(ctx, co, orderID)
+	switch {
+	case errors.Is(err, app.ErrPayPalChanged):
+		back += "?paypal=changed"
+	case paypal.HasIssue(err, "INSTRUMENT_DECLINED") || paypal.HasIssue(err, "PAYER_ACTION_REQUIRED"):
+		back += "?paypal=declined"
+	case err != nil:
+		slog.Error("paypal capture", "invoice", inv.ID, "order", orderID, "err", err)
+		back += "?paypal=error"
+	case paid:
+		back += "?paid=1"
+	default:
+		back += "?paid=1" // pending at PayPal: shown as being processed
+	}
+	http.Redirect(c.W, c.R, back, http.StatusSeeOther)
+	return nil
+}
+
+// paypalWebhook receives PayPal events for one company. PayPal is asked to
+// confirm each one comes from it before anything is done; the order is then
+// read again from the PayPal API.
+func (s *Server) paypalWebhook(w http.ResponseWriter, r *http.Request) {
+	co, err := s.Store.CompanyByPublicID(r.PathValue("pid"))
+	if err != nil || !co.HasPayPal() {
+		http.Error(w, "unknown endpoint", http.StatusNotFound)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := paypal.VerifyWebhook(ctx, s.App.PayPalCredentials(co), co.PayPalWebhookID, r.Header, body); err != nil {
+		slog.Warn("paypal webhook rejected", "company", co.ID, "err", err)
+		http.Error(w, "not verified", http.StatusBadRequest)
+		return
+	}
+	var ev paypal.Event
+	if err := json.Unmarshal(body, &ev); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	entry := store.StripeLog{CompanyID: co.ID, Event: "webhook", Ref: ev.ID, Detail: "PayPal " + ev.EventType}
+	if o, err := s.Store.PayPalOrder(ev.OrderID()); err == nil && o.CompanyID == co.ID {
+		entry.InvoiceID = o.InvoiceID
+		if inv, err := s.Store.Invoice(co.ID, o.InvoiceID); err == nil {
+			entry.ClientID, entry.Number = inv.ClientID, inv.Number
+		}
+	}
+	s.Store.LogStripe(entry)
+	if err := s.App.HandlePayPalEvent(ctx, co, &ev); err != nil {
+		slog.Error("paypal webhook", "type", ev.EventType, "err", err)
+		entry.Event, entry.Level, entry.Detail = "webhook.failed", "error", "PayPal "+ev.EventType+" — "+err.Error()
+		s.Store.LogStripe(entry)
+		http.Error(w, "retry", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // stripeWebhook receives Checkout events for one company. The signature is

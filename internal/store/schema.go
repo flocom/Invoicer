@@ -404,4 +404,25 @@ UPDATE stripe_sessions SET saves_card = 1 WHERE invoice_id IN (SELECT id FROM in
 ALTER TABLE client_cards ADD COLUMN method_type TEXT NOT NULL DEFAULT 'card';
 ALTER TABLE client_cards ADD COLUMN email TEXT NOT NULL DEFAULT '';
 `,
+	// 14 — PayPal: credentials per company, offered per invoice and schedule,
+	// orders created for the payment pages
+	`
+ALTER TABLE companies ADD COLUMN paypal_client_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE companies ADD COLUMN paypal_secret BLOB;
+ALTER TABLE companies ADD COLUMN paypal_sandbox INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE companies ADD COLUMN paypal_card INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE companies ADD COLUMN paypal_webhook_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE invoices ADD COLUMN paypal_payment INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE recurring ADD COLUMN paypal_payment INTEGER NOT NULL DEFAULT 1;
+CREATE TABLE paypal_orders (
+	id         TEXT PRIMARY KEY,
+	company_id INTEGER NOT NULL,
+	invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+	amount     INTEGER NOT NULL,
+	currency   TEXT NOT NULL,
+	status     TEXT NOT NULL DEFAULT 'created',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX paypal_orders_invoice ON paypal_orders(invoice_id);
+`,
 }
