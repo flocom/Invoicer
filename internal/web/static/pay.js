@@ -12,7 +12,8 @@
 
   function show() {
     box.hidden = false;
-    document.querySelectorAll("[data-card-fallback]").forEach(function (b) { b.hidden = true; });
+    // the top button now leads to the form at the bottom of the page
+    document.querySelectorAll("[data-card-fallback]").forEach(function (b) { b.setAttribute("href", "#pay-card"); });
   }
   function fail(msg) {
     errBox.textContent = msg || "";

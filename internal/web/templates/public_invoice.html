@@ -26,24 +26,6 @@
       </div>
     </div>
 
-    {{if or $d.StripeKey $d.PayPalFields}}
-    <section class="paybox" hidden data-paybox data-csrf="{{.CSRF}}" data-lang="{{.Lang}}" data-amount="{{$d.AmountCents}}" data-currency="{{$d.CurrencyLower}}"
-      {{if $d.StripeKey}}data-stripe-key="{{$d.StripeKey}}" data-intent="/pay/{{$d.Token}}/intent" data-return="/pay/{{$d.Token}}/done" {{if $d.SavesCard}}data-save="1"{{end}}{{end}}
-      {{if $d.PayPalFields}}data-paypal-order="/paypal/{{$d.Token}}/order" data-paypal-capture="/paypal/{{$d.Token}}/capture"{{end}}>
-      <div class="paybox-head"><h3>{{template "icon" "card"}}{{.T "public.pay_card"}}</h3><span class="paybox-secure">{{template "icon" "lock"}}{{.T "public.card_secure"}}</span></div>
-      {{if $d.StripeKey}}<div class="paybox-element" data-stripe-element></div>
-      {{else}}<div class="paybox-fields">
-        <div id="pp-card-name" class="pp-field pp-wide"></div>
-        <div id="pp-card-number" class="pp-field pp-wide"></div>
-        <div id="pp-card-expiry" class="pp-field"></div>
-        <div id="pp-card-cvv" class="pp-field"></div>
-      </div>{{end}}
-      <p class="paybox-error" data-pay-error role="alert" hidden></p>
-      <button class="btn btn-primary btn-lg btn-block" type="button" data-pay-submit>{{template "icon" "lock"}}{{.T "public.pay_amount" (.Money $inv.Due $inv.Currency)}}</button>
-      {{if $d.SavesCard}}<p class="hint center">{{.T "public.card_saved_note" $d.Seller.Name}}</p>{{end}}
-    </section>
-    {{end}}
-
     <div class="paper-head">
       <div>
         <div class="muted small upper">{{.T "public.from"}}</div>
@@ -89,6 +71,23 @@
     </div>
     {{end}}
     {{if $inv.Notes}}<p class="notes pre">{{$inv.Notes}}</p>{{end}}
+    {{if or $d.StripeKey $d.PayPalFields}}
+    <section class="paybox" id="pay-card" hidden data-paybox data-csrf="{{.CSRF}}" data-lang="{{.Lang}}" data-amount="{{$d.AmountCents}}" data-currency="{{$d.CurrencyLower}}"
+      {{if $d.StripeKey}}data-stripe-key="{{$d.StripeKey}}" data-intent="/pay/{{$d.Token}}/intent" data-return="/pay/{{$d.Token}}/done" {{if $d.SavesCard}}data-save="1"{{end}}{{end}}
+      {{if $d.PayPalFields}}data-paypal-order="/paypal/{{$d.Token}}/order" data-paypal-capture="/paypal/{{$d.Token}}/capture"{{end}}>
+      <div class="paybox-head"><h3>{{template "icon" "card"}}{{.T "public.pay_card"}}</h3><span class="paybox-secure">{{template "icon" "lock"}}{{.T "public.card_secure"}}</span></div>
+      {{if $d.StripeKey}}<div class="paybox-element" data-stripe-element></div>
+      {{else}}<div class="paybox-fields">
+        <div id="pp-card-name" class="pp-field pp-wide"></div>
+        <div id="pp-card-number" class="pp-field pp-wide"></div>
+        <div id="pp-card-expiry" class="pp-field"></div>
+        <div id="pp-card-cvv" class="pp-field"></div>
+      </div>{{end}}
+      <p class="paybox-error" data-pay-error role="alert" hidden></p>
+      <button class="btn btn-primary btn-lg btn-block" type="button" data-pay-submit>{{template "icon" "lock"}}{{.T "public.pay_amount" (.Money $inv.Due $inv.Currency)}}</button>
+      {{if $d.SavesCard}}<p class="hint center">{{.T "public.card_saved_note" $d.Seller.Name}}</p>{{end}}
+    </section>
+    {{end}}
   </div>
   <footer class="public-foot muted small">{{range lines $d.Co.Footer}}{{.}}<br>{{end}}</footer>
 </div>
