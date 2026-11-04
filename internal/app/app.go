@@ -170,6 +170,8 @@ func (a *App) PDFInput(co *store.Company, inv *store.Invoice) pdf.Input {
 	}
 	if inv.CardOffered(co) && a.BaseURL() != "" {
 		in.PayURL = a.PayURL(inv)
+	} else if inv.PayPalOffered(co) && a.BaseURL() != "" {
+		in.PayURL = a.PublicURL(inv) // the payment page offers PayPal
 	}
 	in.Bank = a.Store.ResolveBank(co.ID, inv.BankAccountID, inv.Currency)
 	return in
@@ -442,6 +444,15 @@ func (a *App) RefreshStripeWebhooks(ctx context.Context) bool {
 		if !a.moveWebhook(ctx, co) {
 			ok = false
 		}
+	}
+	if pcos, err := a.Store.PayPalCompanies(); err == nil {
+		for _, co := range pcos {
+			if !a.movePayPalWebhook(ctx, co) {
+				ok = false
+			}
+		}
+	} else {
+		ok = false
 	}
 	return ok
 }

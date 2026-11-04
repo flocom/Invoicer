@@ -27,6 +27,7 @@ func (a *App) RunScheduler(ctx context.Context) {
 		{name: "recurring", every: 10 * time.Minute, delay: 20 * time.Second, fn: a.RunRecurring},
 		{name: "stripe-reconcile", every: 10 * time.Minute, delay: 40 * time.Second, fn: a.ReconcileStripe},
 		{name: "stripe-webhooks", every: 10 * time.Minute, delay: 30 * time.Second, fn: a.RefreshWebhooksIfMoved},
+		{name: "paypal-reconcile", every: 10 * time.Minute, delay: 50 * time.Second, fn: a.ReconcilePayPal},
 		{name: "reminders", every: time.Hour, delay: 2 * time.Minute, fn: a.RunReminders},
 		{name: "maintenance", every: 24 * time.Hour, delay: 5 * time.Minute, fn: a.Maintenance},
 		{name: "updates", every: 6 * time.Hour, delay: 45 * time.Second, fn: func(ctx context.Context) {
@@ -191,7 +192,7 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 	copy(lines, r.Lines)
 	inv := &store.Invoice{CompanyID: co.ID, ClientID: cl.ID, Currency: r.Currency, Lang: firstNonEmpty(r.Lang, cl.Lang), IssueDate: issue,
 		DueDate: due.AddDate(0, 0, r.DueDays).Format("2006-01-02"), Notes: r.Notes, PublicToken: security.Token(24),
-		RemindersEnabled: true, CardPayment: r.CardPayment, AutoCharge: r.AutoCharge, Lines: lines}
+		RemindersEnabled: true, CardPayment: r.CardPayment, AutoCharge: r.AutoCharge, PayPalPayment: r.PayPalPayment, Lines: lines}
 	remaining := r.Remaining
 	if remaining > 0 {
 		remaining--

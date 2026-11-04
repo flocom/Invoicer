@@ -44,6 +44,11 @@ type Company struct {
 	Archived            bool
 	CreatedAt           int64
 	SaveCards           bool // save the card of every online payment for later charges
+	PayPalClientID      string
+	PayPalSecret        []byte // encrypted
+	PayPalSandbox       bool
+	PayPalCard          bool // offer to pay by card through PayPal (no PayPal account needed)
+	PayPalWebhookID     string
 }
 
 func (c *Company) DisplayName() string {
@@ -55,6 +60,7 @@ func (c *Company) DisplayName() string {
 
 func (c *Company) HasResend() bool { return len(c.ResendKey) > 0 && c.EmailFrom != "" }
 func (c *Company) HasStripe() bool { return len(c.StripeKey) > 0 }
+func (c *Company) HasPayPal() bool { return c.PayPalClientID != "" && len(c.PayPalSecret) > 0 }
 func (c *Company) HasBank() bool   { return c.BankCount > 0 }
 
 // ReminderOffsets parses "-3,0,7" into day offsets relative to the due date.
@@ -72,6 +78,7 @@ const companyCols = `id, public_id, name, legal_name, address, email, phone, web
 	default_currency, default_lang, default_tax_bp, invoice_prefix, payment_terms_days, bank_holder, bank_name, iban, bic,
 	bank_extra, default_notes, footer, resend_key, email_from, email_reply_to, email_bcc, stripe_key, stripe_webhook_secret,
 	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at, save_cards,
+	paypal_client_id, paypal_secret, paypal_sandbox, paypal_card, paypal_webhook_id,
 	(SELECT COUNT(*) FROM bank_accounts b WHERE b.company_id = companies.id)`
 
 func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
@@ -80,7 +87,8 @@ func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 		&c.RegistrationID, &c.Logo, &c.AccentColor, &c.DefaultCurrency, &c.DefaultLang, &c.DefaultTaxBP, &c.InvoicePrefix,
 		&c.PaymentTermsDays, &c.BankHolder, &c.BankName, &c.IBAN, &c.BIC, &c.BankExtra, &c.DefaultNotes, &c.Footer,
 		&c.ResendKey, &c.EmailFrom, &c.EmailReplyTo, &c.EmailBCC, &c.StripeKey, &c.StripeWebhookSecret, &c.StripeWebhookID,
-		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.SaveCards, &c.BankCount)
+		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.SaveCards,
+		&c.PayPalClientID, &c.PayPalSecret, &c.PayPalSandbox, &c.PayPalCard, &c.PayPalWebhookID, &c.BankCount)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -158,6 +166,37 @@ func (s *Store) AllCompanies() ([]*Company, error) {
 // included (their webhook must follow the server too).
 func (s *Store) StripeCompanies() ([]*Company, error) {
 	rows, err := s.DB.Query(`SELECT ` + companyCols + ` FROM companies WHERE length(stripe_key) > 0 ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Company
+	for rows.Next() {
+		c, err := scanCompany(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// UpdateCompanyPayPal stores the PayPal credentials (secret already
+// encrypted; empty client id disconnects).
+func (s *Store) UpdateCompanyPayPal(id int64, clientID string, secret []byte, sandbox, card bool, webhookID string) error {
+	_, err := s.DB.Exec(`UPDATE companies SET paypal_client_id = ?, paypal_secret = ?, paypal_sandbox = ?, paypal_card = ?, paypal_webhook_id = ?
+		WHERE id = ?`, clientID, secret, b2i(sandbox), b2i(card), webhookID, id)
+	return err
+}
+
+func (s *Store) SetPayPalWebhook(id int64, webhookID string) error {
+	_, err := s.DB.Exec(`UPDATE companies SET paypal_webhook_id = ? WHERE id = ?`, webhookID, id)
+	return err
+}
+
+// PayPalCompanies lists every company connected to PayPal, archived ones included.
+func (s *Store) PayPalCompanies() ([]*Company, error) {
+	rows, err := s.DB.Query(`SELECT ` + companyCols + ` FROM companies WHERE paypal_client_id != '' AND length(paypal_secret) > 0 ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}

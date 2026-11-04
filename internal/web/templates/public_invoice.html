@@ -6,6 +6,7 @@
   </header>
 
   {{if and $d.Paid (ne $inv.Status "paid")}}<div class="flash flash-info">{{.T "public.processing"}}</div>{{end}}
+  {{if and $d.PayPalIssue (ne $inv.Status "paid")}}<div class="flash flash-err">{{.TS "public.paypal_" $d.PayPalIssue}}</div>{{end}}
 
   <div class="card public-card">
     <div class="public-summary">
@@ -18,6 +19,8 @@
       </div>
       <div class="public-actions">
         {{if $d.CanPay}}<a class="btn btn-primary btn-lg" href="/pay/{{$d.Token}}">{{template "icon" "card"}}{{.T "public.pay_card"}}</a>{{end}}
+        {{if $d.PayPalCard}}<a class="btn btn-primary btn-lg" href="/paypal/{{$d.Token}}?card=1">{{template "icon" "card"}}{{.T "public.pay_card"}}</a>{{end}}
+        {{if $d.CanPayPal}}<a class="btn btn-lg btn-paypal" href="/paypal/{{$d.Token}}" aria-label="{{.T "public.pay_paypal"}}"><span class="pp-logo"><span class="pp-pay">Pay</span><span class="pp-pal">Pal</span></span></a>{{end}}
         <a class="btn" href="/i/{{$d.Token}}/pdf?dl=1">{{template "icon" "download"}}{{.T "public.download"}}</a>
       </div>
     </div>

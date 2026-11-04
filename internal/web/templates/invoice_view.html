@@ -150,7 +150,7 @@
     {{if or (eq $inv.Status "open") (eq $inv.Status "draft")}}
     <form method="post" action="{{.CPath "/invoices/%d/bank" $inv.ID}}" class="card stack small">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      {{template "paymentmethods" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID "Card" $inv.CardPayment)}}
+      {{template "paymentmethods" (dict "P" $ "Banks" $d.Banks "Sel" $inv.BankAccountID "Card" $inv.CardPayment "PayPal" $inv.PayPalPayment)}}
       {{if $d.Banks}}<p class="hint">{{if $d.Bank}}{{.T "bank.shown" $d.Bank.Name}}{{else}}{{.T "bank.none_shown"}}{{end}}</p>{{end}}
       <div class="form-actions align-end"><button class="btn btn-sm" type="submit">{{.T "action.save"}}</button></div>
     </form>
@@ -168,7 +168,7 @@
       </ul>
       {{if $d.Emails}}<p class="small"><a href="{{.CPath "/emails"}}">{{.T "emails.view_all"}} →</a></p>{{end}}
       {{if $d.StripeLog}}
-      <h4 class="timeline-head">{{template "icon" "card"}}Stripe</h4>
+      <h4 class="timeline-head">{{template "icon" "card"}}{{.T "stripelog.section"}}</h4>
       <ul class="timeline">
         {{range $d.StripeLog}}<li class="lv-{{.Level}}"><strong>{{$.TS "stripelog." .Event}}</strong>{{if .Amount}} · {{$.Money .Amount .Currency}}{{end}} · {{$.DateTime .CreatedAt}}{{if .Detail}}<br><span class="small">{{.Detail}}</span>{{end}}{{if .Ref}}<br><span class="mono small muted">{{.Ref}}</span>{{end}}</li>{{end}}
       </ul>

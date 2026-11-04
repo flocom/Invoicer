@@ -129,13 +129,13 @@ func Rekey(db *sql.DB, old, cur *security.Box) error {
 		fields [][]byte
 	}
 	var rows []row
-	q, err := tx.Query(`SELECT id, resend_key, stripe_key, stripe_webhook_secret FROM companies`)
+	q, err := tx.Query(`SELECT id, resend_key, stripe_key, stripe_webhook_secret, paypal_secret FROM companies`)
 	if err != nil {
 		return err
 	}
 	for q.Next() {
-		r := row{fields: make([][]byte, 3)}
-		if err := q.Scan(&r.id, &r.fields[0], &r.fields[1], &r.fields[2]); err != nil {
+		r := row{fields: make([][]byte, 4)}
+		if err := q.Scan(&r.id, &r.fields[0], &r.fields[1], &r.fields[2], &r.fields[3]); err != nil {
 			q.Close()
 			return err
 		}
@@ -144,8 +144,9 @@ func Rekey(db *sql.DB, old, cur *security.Box) error {
 	q.Close()
 	for _, r := range rows {
 		p := "company:" + strconv.FormatInt(r.id, 10) + ":"
-		if _, err := tx.Exec(`UPDATE companies SET resend_key = ?, stripe_key = ?, stripe_webhook_secret = ? WHERE id = ?`,
-			move(r.fields[0], p+"resend"), move(r.fields[1], p+"stripe"), move(r.fields[2], p+"stripe_whsec"), r.id); err != nil {
+		if _, err := tx.Exec(`UPDATE companies SET resend_key = ?, stripe_key = ?, stripe_webhook_secret = ?, paypal_secret = ? WHERE id = ?`,
+			move(r.fields[0], p+"resend"), move(r.fields[1], p+"stripe"), move(r.fields[2], p+"stripe_whsec"), move(r.fields[3], p+"paypal"),
+			r.id); err != nil {
 			return err
 		}
 	}

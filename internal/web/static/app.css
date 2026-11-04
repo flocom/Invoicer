@@ -613,3 +613,10 @@ body.bare { background: radial-gradient(1100px 520px at 50% -140px, #e6e8ff 0%, 
 ol.steps { margin: .6rem 0 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .45rem; color: var(--text-2); }
 #migrate .disclosure summary { display: flex; align-items: center; gap: .45rem; }
 #migrate .disclosure summary .icon { width: 16px; height: 16px; }
+
+/* ---------- PayPal button ---------- */
+.btn-paypal { background: #ffc439; border-color: #f2b51d; color: #003087; font-weight: 800; font-style: italic; letter-spacing: -.01em; min-width: 9rem; justify-content: center; }
+.btn-paypal:hover { background: #f2ba36; border-color: #e6a917; color: #003087; }
+.btn-paypal .pp-pay { color: #003087; }
+.btn-paypal .pp-pal { color: #0070e0; }
+@media (max-width: 600px) { .public-actions { width: 100%; } .public-actions .btn { flex: 1 1 100%; justify-content: center; } }

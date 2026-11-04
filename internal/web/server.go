@@ -108,9 +108,12 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /i/{token}", s.h(s.publicInvoice))
 	m.HandleFunc("GET /i/{token}/pdf", s.h(s.publicPDF))
 	m.HandleFunc("GET /pay/{token}", s.h(s.publicPay))
+	m.HandleFunc("GET /paypal/{token}", s.h(s.publicPayPal))
+	m.HandleFunc("GET /paypal/{token}/return", s.h(s.publicPayPalReturn))
 	m.HandleFunc("GET /card/{token}", s.h(s.publicCard))
 	m.HandleFunc("GET /card/{token}/setup", s.h(s.publicCardSetup))
 	m.HandleFunc("POST /webhooks/stripe/{pid}", s.stripeWebhook)
+	m.HandleFunc("POST /webhooks/paypal/{pid}", s.paypalWebhook)
 	m.HandleFunc("GET /logo/{pid}", s.h(s.companyLogo))
 
 	// authenticated
@@ -215,6 +218,8 @@ func (s *Server) Handler() http.Handler {
 	ca("POST /c/{cid}/settings/stripe", s.companySaveStripe)
 	ca("POST /c/{cid}/settings/stripe/disconnect", s.companyStripeDisconnect)
 	ca("POST /c/{cid}/settings/stripe/cards", s.companySaveCards)
+	ca("POST /c/{cid}/settings/paypal", s.companySavePayPal)
+	ca("POST /c/{cid}/settings/paypal/disconnect", s.companyPayPalDisconnect)
 	ca("POST /c/{cid}/settings/members", s.companySaveMembers)
 	ca("POST /c/{cid}/settings/archive", s.companyArchive)
 

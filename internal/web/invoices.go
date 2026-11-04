@@ -132,7 +132,8 @@ func (s *Server) invoiceForm(c *Ctx) error {
 		due, _ := time.Parse("2006-01-02", today)
 		inv := &store.Invoice{Currency: co.DefaultCurrency, Lang: co.DefaultLang, IssueDate: today,
 			DueDate: due.AddDate(0, 0, co.PaymentTermsDays).Format("2006-01-02"), Notes: co.DefaultNotes, RemindersEnabled: true, CardPayment: true,
-			Lines: []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}}
+			PayPalPayment: true,
+			Lines:         []store.Line{{Quantity: 1000, TaxBP: co.DefaultTaxBP}}}
 		if cid, _ := strconv.ParseInt(c.R.URL.Query().Get("client"), 10, 64); cid != 0 {
 			if cl, err := s.Store.Client(co.ID, cid); err == nil {
 				inv.ClientID = cl.ID
@@ -226,6 +227,7 @@ func (s *Server) invoiceSave(c *Ctx) error {
 	inv.RemindersEnabled = c.form("reminders") == "1"
 	inv.BankAccountID = s.bankChoice(c)
 	inv.CardPayment = c.form("card_payment") == "1"
+	inv.PayPalPayment = c.form("paypal_payment") == "1"
 	lines, lerr := parseLines(c)
 	if lines != nil {
 		inv.Lines = lines
@@ -363,7 +365,8 @@ func (s *Server) invoiceSetBank(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	if err := s.Store.SetInvoicePayment(c.Company.ID, inv.ID, s.bankChoice(c), c.form("card_payment") == "1"); err != nil {
+	if err := s.Store.SetInvoicePayment(c.Company.ID, inv.ID, s.bankChoice(c), c.form("card_payment") == "1",
+		c.form("paypal_payment") == "1"); err != nil {
 		return err
 	}
 	c.ok("flash.saved")
@@ -571,7 +574,7 @@ func (s *Server) invoiceDuplicate(c *Ctx) error {
 	inv := &store.Invoice{CompanyID: c.Company.ID, ClientID: src.ClientID, Currency: src.Currency, Lang: src.Lang, IssueDate: today,
 		DueDate: due.AddDate(0, 0, c.Company.PaymentTermsDays).Format("2006-01-02"), Notes: src.Notes,
 		PublicToken: security.Token(24), RemindersEnabled: true, BankAccountID: src.BankAccountID,
-		CardPayment: src.CardPayment}
+		CardPayment: src.CardPayment, PayPalPayment: src.PayPalPayment}
 	for _, l := range src.Lines {
 		l.ID = 0
 		inv.Lines = append(inv.Lines, l)
