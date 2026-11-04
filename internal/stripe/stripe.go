@@ -141,6 +141,65 @@ var webhookEvents = []string{
 	"checkout.session.async_payment_succeeded",
 	"checkout.session.async_payment_failed",
 	"checkout.session.expired",
+	"payment_intent.succeeded",
+	"payment_intent.payment_failed",
+}
+
+// UpdateWebhookEvents subscribes an existing endpoint to the events this
+// version listens to.
+func UpdateWebhookEvents(ctx context.Context, key, id string) error {
+	f := url.Values{}
+	for _, e := range webhookEvents {
+		f.Add("enabled_events[]", e)
+	}
+	return call(ctx, key, http.MethodPost, "/v1/webhook_endpoints/"+url.PathEscape(id), f, nil)
+}
+
+// ValidPublishableKey tells a publishable key (used by the card form shown
+// on the payment page).
+func ValidPublishableKey(k string) bool {
+	return (strings.HasPrefix(k, "pk_live_") || strings.HasPrefix(k, "pk_test_")) && len(k) > 20 && len(k) < 300
+}
+
+// IntentParams describes a payment confirmed in the browser (card form on
+// the payment page).
+type IntentParams struct {
+	Amount         int64
+	Currency       string
+	Customer       string // when set, the card is saved on it for later off-session payments
+	Email          string // receipt e-mail when there is no customer
+	Description    string
+	Metadata       map[string]string
+	IdempotencyKey string
+}
+
+// CreatePaymentIntent creates a card payment to confirm with Stripe.js.
+func CreatePaymentIntent(ctx context.Context, key string, p IntentParams) (*PaymentIntent, error) {
+	f := url.Values{}
+	f.Set("amount", strconv.FormatInt(p.Amount, 10))
+	f.Set("currency", strings.ToLower(p.Currency))
+	f.Set("payment_method_types[0]", "card")
+	if p.Customer != "" {
+		f.Set("customer", p.Customer)
+		f.Set("setup_future_usage", "off_session")
+	}
+	if p.Description != "" {
+		f.Set("description", p.Description)
+	}
+	for k, v := range p.Metadata {
+		f.Set("metadata["+k+"]", v)
+	}
+	var pi PaymentIntent
+	if err := callIdem(ctx, key, http.MethodPost, "/v1/payment_intents", f, p.IdempotencyKey, &pi); err != nil {
+		return nil, err
+	}
+	return &pi, nil
+}
+
+// CancelPaymentIntent stops a payment that was not confirmed (the invoice
+// changed); one that can no longer be cancelled is left as it is.
+func CancelPaymentIntent(ctx context.Context, key, id string) error {
+	return call(ctx, key, http.MethodPost, "/v1/payment_intents/"+url.PathEscape(id)+"/cancel", url.Values{}, nil)
 }
 
 // CreateWebhook registers our endpoint on the account and returns its id and
@@ -340,6 +399,7 @@ type Card struct {
 // PaymentIntent is the subset of a payment we need.
 type PaymentIntent struct {
 	ID             string            `json:"id"`
+	ClientSecret   string            `json:"client_secret"`
 	Status         string            `json:"status"` // succeeded, processing, requires_payment_method, requires_action, canceled…
 	Amount         int64             `json:"amount"`
 	AmountReceived int64             `json:"amount_received"`

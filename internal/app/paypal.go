@@ -148,8 +148,26 @@ var paypalLocale = map[string]string{"fr": "fr-FR", "en": "en-US"}
 // PayPal page where the client pays, with their PayPal account or (card) a
 // bank card without account.
 func (a *App) PayPalCheckout(ctx context.Context, co *store.Company, inv *store.Invoice, card bool) (string, error) {
+	o, err := a.payPalOrder(ctx, co, inv, card, false)
+	if err != nil {
+		return "", err
+	}
+	return o.ApproveURL(), nil
+}
+
+// PayPalCardOrder creates the order paid with the PayPal card fields shown
+// on the payment page itself, and returns its id.
+func (a *App) PayPalCardOrder(ctx context.Context, co *store.Company, inv *store.Invoice) (string, error) {
+	o, err := a.payPalOrder(ctx, co, inv, true, true)
+	if err != nil {
+		return "", err
+	}
+	return o.ID, nil
+}
+
+func (a *App) payPalOrder(ctx context.Context, co *store.Company, inv *store.Invoice, card, inline bool) (*paypal.Order, error) {
 	if !inv.PayPalPayable(co) {
-		return "", errors.New("this invoice cannot be paid with PayPal")
+		return nil, errors.New("this invoice cannot be paid with PayPal")
 	}
 	lk, _ := a.checkoutLocks.LoadOrStore(inv.ID, &sync.Mutex{})
 	lk.(*sync.Mutex).Lock()
@@ -158,17 +176,17 @@ func (a *App) PayPalCheckout(ctx context.Context, co *store.Company, inv *store.
 	o, err := paypal.CreateOrder(ctx, a.PayPalCredentials(co), paypal.OrderParams{
 		Amount: inv.Due(), Currency: inv.Currency, Description: i18n.T(lang, "pdf.invoice") + " " + inv.Number,
 		CustomID: co.PublicID + ":" + strconv.FormatInt(inv.ID, 10), BrandName: co.DisplayName(), Locale: paypalLocale[lang],
-		Card: card && co.PayPalCard, ReturnURL: a.BaseURL() + "/paypal/" + inv.PublicToken + "/return", CancelURL: a.PublicURL(inv),
+		Card: card && co.PayPalCard, Inline: inline, ReturnURL: a.BaseURL() + "/paypal/" + inv.PublicToken + "/return", CancelURL: a.PublicURL(inv),
 		RequestID: "invoicer-" + security.Token(12),
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := a.Store.SavePayPalOrder(store.PayPalOrder{ID: o.ID, CompanyID: co.ID, InvoiceID: inv.ID, Amount: inv.Due(), Currency: inv.Currency}); err != nil {
-		return "", err
+		return nil, err
 	}
 	a.logStripe(co, inv, store.StripeLog{Event: "paypal.created", Ref: o.ID, Amount: inv.Due()})
-	return o.ApproveURL(), nil
+	return o, nil
 }
 
 // ApplyPayPalOrder captures an order the client approved and records the

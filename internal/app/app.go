@@ -587,12 +587,25 @@ func (a *App) ExpireSessions(ctx context.Context, co *store.Company, invoiceID i
 	if !co.HasStripe() {
 		return
 	}
+	key := a.StripeKey(co)
+	inv, _ := a.Store.Invoice(co.ID, invoiceID)
+	// payments started with the card form of the payment page
+	intents, _ := a.Store.OpenStripeIntents(invoiceID)
+	for _, it := range intents {
+		if it.ID == keep {
+			continue
+		}
+		if err := stripe.CancelPaymentIntent(ctx, key, it.ID); err != nil {
+			// already confirmed or going through: the follow-up records it
+			slog.Warn("could not cancel Stripe payment", "payment", it.ID, "err", err)
+			continue
+		}
+		a.Store.SetStripeIntentStatus(it.ID, "canceled")
+	}
 	sessions, err := a.Store.OpenStripeSessions(invoiceID)
 	if err != nil {
 		return
 	}
-	key := a.StripeKey(co)
-	inv, _ := a.Store.Invoice(co.ID, invoiceID)
 	for _, ss := range sessions {
 		if ss.ID == keep {
 			continue

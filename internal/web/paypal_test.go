@@ -113,6 +113,13 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 					PayPal struct {
 						Ctx map[string]string `json:"experience_context"`
 					} `json:"paypal"`
+					Card *struct {
+						Attributes struct {
+							Verification struct {
+								Method string `json:"method"`
+							} `json:"verification"`
+						} `json:"attributes"`
+					} `json:"card"`
 				} `json:"payment_source"`
 			}
 			json.NewDecoder(r.Body).Decode(&body)
@@ -120,6 +127,9 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 			id := fmt.Sprintf("ORDER%d", f.n)
 			f.orders[id] = body.PurchaseUnits[0]
 			f.landing[id] = body.PaymentSource.PayPal.Ctx["landing_page"] + "|" + body.PaymentSource.PayPal.Ctx["return_url"]
+			if c := body.PaymentSource.Card; c != nil {
+				f.landing[id] = "CARD|" + c.Attributes.Verification.Method
+			}
 			f.status[id] = "PAYER_ACTION_REQUIRED"
 			w.WriteHeader(201)
 			io.WriteString(w, order(id))
@@ -346,5 +356,49 @@ func TestPayPalPayments(t *testing.T) {
 	b.post("/c/1/settings/paypal/disconnect", nil)
 	if co, _ := e.app.Store.Company(1); co.HasPayPal() || len(pp.hooks) != 0 {
 		t.Fatalf("still connected: %v", pp.hooks)
+	}
+}
+
+func TestPayPalCardFieldsOnThePaymentPage(t *testing.T) {
+	e := newEnv(t)
+	pp := newFakePayPal(t)
+	b := setupOwner(t, e)
+	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
+	e.app.Store.SetSetting("base_url", e.srv.URL)
+	b.post("/c/1/clients/new", url.Values{"name": {"Globex"}, "lang": {"en"}})
+	b.post("/c/1/settings/paypal", url.Values{"paypal_client_id": {"cid"}, "paypal_secret": {"sec"}, "paypal_card": {"1"}})
+	b.post("/c/1/invoices/new", url.Values{"client_id": {"1"}, "currency": {"EUR"}, "lang": {"en"}, "issue_date": {e.app.Today()},
+		"due_date": {time.Now().AddDate(0, 0, 30).Format("2006-01-02")}, "line_desc": {"Work"}, "line_qty": {"1"},
+		"line_price": {"80"}, "line_tax": {"0"}, "action": {"issue"}, "paypal_payment": {"1"}})
+	inv, _ := e.app.Store.Invoice(1, 1)
+
+	// the page loads PayPal's card fields (shown only when the account offers
+	// them), and keeps the button to PayPal's card page
+	anon := e.browser()
+	anon.get("/i/" + inv.PublicToken)
+	anon.must("https://www.paypal.com/sdk/js?client-id=cid&amp;components=card-fields&amp;currency=EUR&amp;intent=capture")
+	anon.must(`data-paypal-order="/paypal/` + inv.PublicToken + `/order"`)
+	anon.must(`href="/paypal/` + inv.PublicToken + `?card=1" data-card-fallback`)
+
+	code, out := anon.postJS("/paypal/"+inv.PublicToken+"/order", "")
+	if code != 200 || out["id"] == "" || pp.landing[out["id"]] != "CARD|SCA_WHEN_REQUIRED" {
+		t.Fatalf("card order: %d %v %v", code, out, pp.landing)
+	}
+	id := out["id"]
+	// not approved (3-D Secure failed): refused, nothing recorded
+	if code, out = anon.postJS("/paypal/"+inv.PublicToken+"/capture", "order="+id); code != 402 || out["error"] == "" {
+		t.Fatalf("capture before approval: %d %v", code, out)
+	}
+	pp.approve(id)
+	if code, out = anon.postJS("/paypal/"+inv.PublicToken+"/capture", "order="+id); code != 200 || out["redirect"] != "/i/"+inv.PublicToken+"?paid=1" {
+		t.Fatalf("capture: %d %v", code, out)
+	}
+	pays, _ := e.app.Store.Payments(inv.ID)
+	if got, _ := e.app.Store.Invoice(1, inv.ID); got.Status != store.StatusPaid || len(pays) != 1 || pays[0].Method != "paypal" {
+		t.Fatalf("paid with the card fields: %s %+v", got.Status, pays)
+	}
+	// an order of another invoice is refused
+	if code, _ = anon.postJS("/paypal/"+inv.PublicToken+"/capture", "order=ORDER999"); code != 404 {
+		t.Fatalf("unknown order: %d", code)
 	}
 }

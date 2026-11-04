@@ -24,6 +24,7 @@ import (
 	"github.com/flocom/invoicer/internal/money"
 	"github.com/flocom/invoicer/internal/security"
 	"github.com/flocom/invoicer/internal/store"
+	"github.com/flocom/invoicer/internal/stripe"
 )
 
 func (s *Server) home(c *Ctx) error {
@@ -425,6 +426,29 @@ func (s *Server) companyPayPalDisconnect(c *Ctx) error {
 	c.audit("company.settings", "paypal disconnected")
 	c.ok("flash.saved")
 	return c.redirect(c.cpath("/settings?tab=payments"))
+}
+
+// companySaveCardForm stores the publishable key that shows Stripe's card
+// form on the payment page (empty: the button to Stripe Checkout, as before).
+func (s *Server) companySaveCardForm(c *Ctx) error {
+	back := c.cpath("/settings?tab=payments") + "#cardform"
+	key := strings.TrimSpace(c.form("stripe_publishable"))
+	if key != "" {
+		if !stripe.ValidPublishableKey(key) {
+			c.bad("settings.cardform_bad_key")
+			return c.redirect(back)
+		}
+		if secret := s.App.StripeKey(c.Company); secret != "" && stripe.IsTestKey(secret) != stripe.IsTestKey(key) {
+			c.bad("settings.cardform_mode_mismatch")
+			return c.redirect(back)
+		}
+	}
+	if err := s.Store.SetStripePublishable(c.Company.ID, key); err != nil {
+		return err
+	}
+	c.audit("company.settings", "stripe card form: "+strconv.FormatBool(key != ""))
+	c.ok("flash.saved")
+	return c.redirect(back)
 }
 
 // companySaveCards chooses whether every online card payment saves the

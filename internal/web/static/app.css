@@ -620,3 +620,17 @@ ol.steps { margin: .6rem 0 0; padding-left: 1.2rem; display: flex; flex-directio
 .btn-paypal .pp-pay { color: #003087; }
 .btn-paypal .pp-pal { color: #0070e0; }
 @media (max-width: 600px) { .public-actions { width: 100%; } .public-actions .btn { flex: 1 1 100%; justify-content: center; } }
+
+/* ---------- card form of the payment page ---------- */
+.paybox { margin: 0 0 1.6rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2);
+  display: flex; flex-direction: column; gap: 1rem; }
+.paybox-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.paybox-head h3 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1rem; }
+.paybox-secure { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .8rem; }
+.paybox-secure .icon { width: 14px; height: 14px; }
+.paybox-element { min-height: 2.5rem; }
+.paybox-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .75rem; }
+.paybox-fields .pp-wide { grid-column: 1 / -1; }
+.paybox-error { color: var(--danger-strong); font-size: .9rem; margin: 0; }
+.btn.is-busy { opacity: .7; cursor: progress; }
+@media (max-width: 600px) { .paybox { padding: 1rem; } .paybox-fields { grid-template-columns: 1fr; } }

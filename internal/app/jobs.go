@@ -26,7 +26,10 @@ func (a *App) RunScheduler(ctx context.Context) {
 	jobs := []*job{
 		{name: "recurring", every: 10 * time.Minute, delay: 20 * time.Second, fn: a.RunRecurring},
 		{name: "stripe-reconcile", every: 10 * time.Minute, delay: 40 * time.Second, fn: a.ReconcileStripe},
-		{name: "stripe-webhooks", every: 10 * time.Minute, delay: 30 * time.Second, fn: a.RefreshWebhooksIfMoved},
+		{name: "stripe-webhooks", every: 10 * time.Minute, delay: 30 * time.Second, fn: func(ctx context.Context) {
+			a.RefreshWebhooksIfMoved(ctx)
+			a.UpdateStripeWebhookEvents(ctx)
+		}},
 		{name: "paypal-reconcile", every: 10 * time.Minute, delay: 50 * time.Second, fn: a.ReconcilePayPal},
 		{name: "reminders", every: time.Hour, delay: 2 * time.Minute, fn: a.RunReminders},
 		{name: "maintenance", every: 24 * time.Hour, delay: 5 * time.Minute, fn: a.Maintenance},
@@ -324,6 +327,7 @@ func (a *App) RunReminders(ctx context.Context) {
 // even without webhooks (local installs, or a missed delivery).
 func (a *App) ReconcileStripe(ctx context.Context) {
 	defer a.ReconcileCards(ctx)
+	defer a.reconcileIntents(ctx)
 	sessions, err := a.Store.PendingStripeSessions()
 	if err != nil {
 		return

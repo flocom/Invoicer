@@ -171,6 +171,17 @@
   <div class="form-actions"><button class="btn btn-primary" type="submit">{{if $d.StripeKeySet}}{{.T "settings.stripe_replace"}}{{else}}{{.T "settings.stripe_connect"}}{{end}}</button></div>
 </form>
 {{if $d.StripeKeySet}}
+<form method="post" action="{{.CPath "/settings/stripe/form"}}" class="card stack" id="cardform" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <h2>{{.T "settings.cardform_title"}}</h2>
+  <p class="hint">{{.T "settings.cardform_intro"}}</p>
+  {{if $c.StripePublishable}}<p class="status-line ok">{{template "icon" "check"}}{{.T "settings.cardform_on"}}</p>
+  {{else}}<p class="status-line off">{{template "icon" "x"}}{{.T "settings.cardform_off"}}</p>{{end}}
+  <div class="field"><label for="stripe_publishable">{{.T "settings.cardform_key"}}</label>
+    <input id="stripe_publishable" name="stripe_publishable" class="mono" spellcheck="false" maxlength="300" value="{{$c.StripePublishable}}" placeholder="pk_live_…">
+    <p class="hint">{{.T "settings.cardform_key_hint"}}</p></div>
+  <div class="form-actions"><button class="btn" type="submit">{{.T "action.save"}}</button></div>
+</form>
 <form method="post" action="{{.CPath "/settings/stripe/cards"}}" class="card stack" id="cards">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <h2>{{.T "settings.cards_title"}}</h2>

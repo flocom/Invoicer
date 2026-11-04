@@ -28,10 +28,13 @@ type fakeAPIs struct {
 	idem      []string
 	mails     []map[string]any
 	n         int
+	intents   map[string]url.Values // payments of the card form: id → creation form
+	intentSt  map[string]string     // id → status (set by tests: what the browser did)
+	canceled  []string
 }
 
 func newFakeAPIs(t *testing.T) *fakeAPIs {
-	f := &fakeAPIs{}
+	f := &fakeAPIs{intents: map[string]url.Values{}, intentSt: map[string]string{}}
 	card := func(pm string) string {
 		last4 := "4242"
 		if pm == "pm_declined" {
@@ -68,6 +71,23 @@ func newFakeAPIs(t *testing.T) *fakeAPIs {
 			fmt.Fprintf(w, `{"id":%q,"status":"complete","mode":"setup","setup_intent":"seti_1","customer":"cus_1"}`, strings.TrimPrefix(p, "/v1/checkout/sessions/"))
 		case p == "/v1/setup_intents/seti_1":
 			fmt.Fprintf(w, `{"status":"succeeded","payment_method":%s}`, card("pm_1"))
+		case p == "/v1/payment_intents" && r.Method == "POST" && r.PostForm.Get("confirm") != "true":
+			// created for the card form, confirmed later in the browser
+			id := fmt.Sprintf("pi_form_%d", len(f.intents)+1)
+			f.intents[id] = r.PostForm
+			f.intentSt[id] = "requires_payment_method"
+			fmt.Fprintf(w, `{"id":%q,"client_secret":%q,"status":"requires_payment_method","amount":%s,"currency":%q}`,
+				id, id+"_secret_x", r.PostForm.Get("amount"), r.PostForm.Get("currency"))
+		case strings.HasPrefix(p, "/v1/payment_intents/pi_form_") && strings.HasSuffix(p, "/cancel"):
+			id := strings.TrimSuffix(strings.TrimPrefix(p, "/v1/payment_intents/"), "/cancel")
+			f.intentSt[id] = "canceled"
+			f.canceled = append(f.canceled, id)
+			io.WriteString(w, `{}`)
+		case strings.HasPrefix(p, "/v1/payment_intents/pi_form_") && r.Method == "GET":
+			id := strings.TrimPrefix(p, "/v1/payment_intents/")
+			form := f.intents[id]
+			fmt.Fprintf(w, `{"id":%q,"client_secret":%q,"status":%q,"amount":%s,"amount_received":%s,"currency":%q,"customer":%q,"payment_method":%s}`,
+				id, id+"_secret_x", f.intentSt[id], form.Get("amount"), form.Get("amount"), form.Get("currency"), form.Get("customer"), card("pm_form"))
 		case p == "/v1/payment_intents" && r.Method == "POST":
 			f.charges = append(f.charges, r.PostForm)
 			f.idem = append(f.idem, r.Header.Get("Idempotency-Key"))
