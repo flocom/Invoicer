@@ -49,6 +49,7 @@ type Company struct {
 	PayPalSandbox       bool
 	PayPalCard          bool // offer to pay by card through PayPal (no PayPal account needed)
 	PayPalWebhookID     string
+	StripePublishable   string // pk_… key: card form on the payment page
 }
 
 func (c *Company) DisplayName() string {
@@ -78,7 +79,7 @@ const companyCols = `id, public_id, name, legal_name, address, email, phone, web
 	default_currency, default_lang, default_tax_bp, invoice_prefix, payment_terms_days, bank_holder, bank_name, iban, bic,
 	bank_extra, default_notes, footer, resend_key, email_from, email_reply_to, email_bcc, stripe_key, stripe_webhook_secret,
 	stripe_webhook_id, stripe_account, reminders_enabled, reminder_days, archived, created_at, save_cards,
-	paypal_client_id, paypal_secret, paypal_sandbox, paypal_card, paypal_webhook_id,
+	paypal_client_id, paypal_secret, paypal_sandbox, paypal_card, paypal_webhook_id, stripe_publishable_key,
 	(SELECT COUNT(*) FROM bank_accounts b WHERE b.company_id = companies.id)`
 
 func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
@@ -88,7 +89,7 @@ func scanCompany(row interface{ Scan(...any) error }) (*Company, error) {
 		&c.PaymentTermsDays, &c.BankHolder, &c.BankName, &c.IBAN, &c.BIC, &c.BankExtra, &c.DefaultNotes, &c.Footer,
 		&c.ResendKey, &c.EmailFrom, &c.EmailReplyTo, &c.EmailBCC, &c.StripeKey, &c.StripeWebhookSecret, &c.StripeWebhookID,
 		&c.StripeAccount, &c.RemindersEnabled, &c.ReminderDays, &c.Archived, &c.CreatedAt, &c.SaveCards,
-		&c.PayPalClientID, &c.PayPalSecret, &c.PayPalSandbox, &c.PayPalCard, &c.PayPalWebhookID, &c.BankCount)
+		&c.PayPalClientID, &c.PayPalSecret, &c.PayPalSandbox, &c.PayPalCard, &c.PayPalWebhookID, &c.StripePublishable, &c.BankCount)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -186,6 +187,11 @@ func (s *Store) StripeCompanies() ([]*Company, error) {
 func (s *Store) UpdateCompanyPayPal(id int64, clientID string, secret []byte, sandbox, card bool, webhookID string) error {
 	_, err := s.DB.Exec(`UPDATE companies SET paypal_client_id = ?, paypal_secret = ?, paypal_sandbox = ?, paypal_card = ?, paypal_webhook_id = ?
 		WHERE id = ?`, clientID, secret, b2i(sandbox), b2i(card), webhookID, id)
+	return err
+}
+
+func (s *Store) SetStripePublishable(id int64, key string) error {
+	_, err := s.DB.Exec(`UPDATE companies SET stripe_publishable_key = ? WHERE id = ?`, key, id)
 	return err
 }
 

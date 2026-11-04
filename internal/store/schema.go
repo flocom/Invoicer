@@ -425,4 +425,20 @@ CREATE TABLE paypal_orders (
 );
 CREATE INDEX paypal_orders_invoice ON paypal_orders(invoice_id);
 `,
+	// 15 — card form on the payment page: Stripe publishable key, payments
+	// confirmed in the browser
+	`
+ALTER TABLE companies ADD COLUMN stripe_publishable_key TEXT NOT NULL DEFAULT '';
+CREATE TABLE stripe_intents (
+	id         TEXT PRIMARY KEY,
+	company_id INTEGER NOT NULL,
+	invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+	amount     INTEGER NOT NULL,
+	currency   TEXT NOT NULL,
+	saves_card INTEGER NOT NULL DEFAULT 0,
+	status     TEXT NOT NULL DEFAULT 'open',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX stripe_intents_invoice ON stripe_intents(invoice_id);
+`,
 }

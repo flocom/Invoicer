@@ -67,6 +67,7 @@ That's it. No `.env` to fill in: the domain is detected from your browser, and t
 - Public invoice page with **Pay by card** (Stripe Checkout); the PDF QR code opens it
 - **Saved cards**: recurring invoices can charge the client's card automatically (optionally, every online payment saves the card); a failed payment e-mails the client a link to update their card; charge any unpaid invoice from the client page with the card of your choice
 - Stripe webhook set up automatically — no copy-pasting secrets
+- **Card form on the payment page**: with the Stripe publishable key, clients type their card on the invoice page itself (Stripe's secure fields, Apple Pay and Google Pay included); with PayPal's advanced card payments, PayPal's card fields are shown there too. Otherwise the buttons open Stripe Checkout or PayPal, as before
 - **PayPal**: clients pay with their PayPal account or with a bank card on PayPal's page (no account needed); live/sandbox mode and the webhook are set up automatically
 - **You are told by e-mail** (at the company's address) when a card payment goes through or an automatic charge is declined; a **Stripe log** shows every payment link, payment, charge and webhook
 - Several bank accounts per company (one per currency or more); each invoice shows the account in its currency, or the one you pick, or none

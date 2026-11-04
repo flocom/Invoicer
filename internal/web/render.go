@@ -139,8 +139,9 @@ type Page struct {
 	Version    string
 	AssetVer   string
 	BaseURL    string
-	NewOrigin  string // detected origin differs from the stored one (admin banner)
-	MovedTo    string // this server moved there (admin banner)
+	NewOrigin  string   // detected origin differs from the stored one (admin banner)
+	Scripts    []string // extra scripts (the payment page's card forms)
+	MovedTo    string   // this server moved there (admin banner)
 	UpdateNote string
 	Bare       bool // no navigation (login, setup, public pages)
 	loc        *time.Location

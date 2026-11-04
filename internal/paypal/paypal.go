@@ -253,6 +253,7 @@ type OrderParams struct {
 	BrandName   string
 	Locale      string // fr-FR, en-US
 	Card        bool   // open PayPal's page on the card form (no PayPal account needed)
+	Inline      bool   // paid with the card fields of our own page (3-D Secure when required)
 	ReturnURL   string
 	CancelURL   string
 	RequestID   string
@@ -271,16 +272,27 @@ func CreateOrder(ctx context.Context, c Credentials, p OrderParams) (*Order, err
 			"description": truncate(p.Description, 127),
 			"amount":      map[string]string{"currency_code": strings.ToUpper(p.Currency), "value": FormatAmount(p.Amount)},
 		}},
-		"payment_source": map[string]any{"paypal": map[string]any{"experience_context": map[string]string{
-			"brand_name":          truncate(p.BrandName, 127),
-			"locale":              p.Locale,
-			"landing_page":        landing,
-			"user_action":         "PAY_NOW",
-			"shipping_preference": "NO_SHIPPING",
-			"return_url":          p.ReturnURL,
-			"cancel_url":          p.CancelURL,
-		}}},
 	}
+	if p.Inline {
+		body["payment_source"] = map[string]any{"card": map[string]any{
+			"attributes":         map[string]any{"verification": map[string]string{"method": "SCA_WHEN_REQUIRED"}},
+			"experience_context": map[string]string{"return_url": p.ReturnURL, "cancel_url": p.CancelURL},
+		}}
+		var o Order
+		if err := call(ctx, c, http.MethodPost, "/v2/checkout/orders", body, p.RequestID, &o); err != nil {
+			return nil, err
+		}
+		return &o, nil
+	}
+	body["payment_source"] = map[string]any{"paypal": map[string]any{"experience_context": map[string]string{
+		"brand_name":          truncate(p.BrandName, 127),
+		"locale":              p.Locale,
+		"landing_page":        landing,
+		"user_action":         "PAY_NOW",
+		"shipping_preference": "NO_SHIPPING",
+		"return_url":          p.ReturnURL,
+		"cancel_url":          p.CancelURL,
+	}}}
 	var o Order
 	if err := call(ctx, c, http.MethodPost, "/v2/checkout/orders", body, p.RequestID, &o); err != nil {
 		return nil, err

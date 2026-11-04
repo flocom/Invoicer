@@ -10,7 +10,8 @@
 <title>{{if .Title}}{{.Title}} · {{end}}Invoicer</title>
 <link rel="icon" href="/static/favicon.svg?v={{.AssetVer}}" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css?v={{.AssetVer}}">
-<script src="/static/app.js?v={{.AssetVer}}" defer></script>
+{{range .Scripts}}<script src="{{.}}" defer></script>
+{{end}}<script src="/static/app.js?v={{.AssetVer}}" defer></script>
 </head>
 {{if .Bare}}
 <body class="bare">
