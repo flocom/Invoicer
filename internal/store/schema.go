@@ -441,4 +441,12 @@ CREATE TABLE stripe_intents (
 );
 CREATE INDEX stripe_intents_invoice ON stripe_intents(invoice_id);
 `,
+	// 16 — PayPal payments are marked delivered (no tracking number, buyer
+	// not notified) so PayPal releases the funds without asking for proof
+	`
+ALTER TABLE paypal_orders ADD COLUMN capture_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE paypal_orders ADD COLUMN tracked INTEGER NOT NULL DEFAULT 0;
+UPDATE paypal_orders SET capture_id = COALESCE((SELECT reference FROM payments WHERE stripe_session_id = 'paypal:' || paypal_orders.id), '')
+	WHERE status = 'complete';
+`,
 }

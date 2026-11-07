@@ -250,7 +250,8 @@ func (a *App) ApplyPayPalOrder(ctx context.Context, co *store.Company, orderID s
 	if err != nil {
 		return false, err
 	}
-	a.Store.SetPayPalOrderStatus(orderID, "complete")
+	a.Store.SetPayPalCapture(orderID, cp.ID)
+	a.markPayPalDelivered(ctx, co, inv, orderID, cp.ID)
 	if !recorded {
 		return true, nil
 	}
@@ -265,9 +266,30 @@ func (a *App) ApplyPayPalOrder(ctx context.Context, co *store.Company, orderID s
 	return true, nil
 }
 
+// markPayPalDelivered tells PayPal the order was delivered (no tracking
+// number, buyer not notified); retried by the follow-up job if PayPal fails.
+func (a *App) markPayPalDelivered(ctx context.Context, co *store.Company, inv *store.Invoice, orderID, captureID string) {
+	if err := paypal.MarkDelivered(ctx, a.PayPalCredentials(co), captureID); err != nil {
+		slog.Warn("paypal: not marked delivered", "order", orderID, "err", err)
+		return
+	}
+	a.Store.SetPayPalTracked(orderID)
+	a.logStripe(co, inv, store.StripeLog{Event: "paypal.delivered", Ref: captureID})
+}
+
 // ReconcilePayPal follows up orders whose client did not come back from
-// PayPal after approving them.
+// PayPal after approving them, and paid orders not yet marked delivered.
 func (a *App) ReconcilePayPal(ctx context.Context) {
+	if paid, caps, err := a.Store.UntrackedPayPalCaptures(); err == nil {
+		for _, o := range paid {
+			co, err := a.Store.Company(o.CompanyID)
+			if err != nil || !co.HasPayPal() {
+				continue
+			}
+			inv, _ := a.Store.Invoice(co.ID, o.InvoiceID)
+			a.markPayPalDelivered(ctx, co, inv, o.ID, caps[o.ID])
+		}
+	}
 	orders, err := a.Store.OpenPayPalOrders()
 	if err != nil {
 		return

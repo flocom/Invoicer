@@ -27,6 +27,8 @@ type fakePayPal struct {
 	n        int
 	hooks    map[string]string // webhook id → url
 	hookN    int
+	trackers []map[string]any // tracking info added to captures
+	trackErr bool             // the tracking API fails
 }
 
 func newFakePayPal(t *testing.T) *fakePayPal {
@@ -65,6 +67,18 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 			return string(b)
 		}
 		switch {
+		case p == "/v1/shipping/trackers-batch" && r.Method == "POST":
+			if f.trackErr {
+				w.WriteHeader(500)
+				io.WriteString(w, `{"name":"INTERNAL_SERVER_ERROR","message":"boom"}`)
+				return
+			}
+			var body struct {
+				Trackers []map[string]any `json:"trackers"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			f.trackers = append(f.trackers, body.Trackers...)
+			io.WriteString(w, `{"tracker_identifiers":[],"errors":[]}`)
 		case p == "/v1/notifications/webhooks" && r.Method == "POST":
 			var body struct {
 				URL string `json:"url"`
@@ -273,6 +287,15 @@ func TestPayPalPayments(t *testing.T) {
 	}
 	b.get("/c/1/invoices/" + strconv.FormatInt(inv.ID, 10))
 	b.must("PayPal payment received")
+	// marked delivered on PayPal: no tracking number, buyer not notified
+	if len(pp.trackers) != 1 {
+		t.Fatalf("trackers: %v", pp.trackers)
+	}
+	tr := pp.trackers[0]
+	if tr["transaction_id"] != "CAP-"+id || tr["status"] != "DELIVERED" || tr["notify_buyer"] != false || tr["tracking_number"] != nil {
+		t.Fatalf("tracker: %v", tr)
+	}
+	b.must("Marked delivered on PayPal")
 	// the other order (card) can no longer be taken: the invoice is paid
 	pp.approve(card)
 	if loc := ret(card); !strings.HasSuffix(loc, "?paypal=changed") {
@@ -282,14 +305,28 @@ func TestPayPalPayments(t *testing.T) {
 		t.Fatal("an order was captured on a paid invoice")
 	}
 
-	// a client approving without coming back is caught by the follow-up job
+	// a client approving without coming back is caught by the follow-up job;
+	// if PayPal's tracking fails, marking it delivered is retried later
 	inv = newInvoice("50", url.Values{"paypal_payment": {"1"}})
 	anon.get("/i/" + inv.PublicToken)
 	id = start("")
 	pp.approve(id)
+	pp.trackErr = true
 	e.app.ReconcilePayPal(t.Context())
 	if got, _ := e.app.Store.Invoice(1, inv.ID); got.Status != store.StatusPaid {
 		t.Fatalf("follow-up: %s", got.Status)
+	}
+	if len(pp.trackers) != 1 {
+		t.Fatal("tracking should have failed")
+	}
+	pp.trackErr = false
+	e.app.ReconcilePayPal(t.Context())
+	if len(pp.trackers) != 2 || pp.trackers[1]["transaction_id"] != "CAP-"+id {
+		t.Fatalf("tracking retried: %v", pp.trackers)
+	}
+	e.app.ReconcilePayPal(t.Context())
+	if len(pp.trackers) != 2 {
+		t.Fatal("marked delivered twice")
 	}
 
 	// an invoice without PayPal does not offer it

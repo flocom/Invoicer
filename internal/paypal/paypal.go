@@ -489,3 +489,42 @@ func (e *Event) OrderID() string {
 	}
 	return e.Resource.SupplementaryData.RelatedIDs.OrderID
 }
+
+// ---------- tracking ----------
+
+// MarkDelivered adds tracking information to a capture: delivered, without
+// tracking number, without notifying the buyer (an invoice for a service or
+// goods already handed over). PayPal then releases the funds without asking
+// the seller for proof of shipment.
+func MarkDelivered(ctx context.Context, c Credentials, captureID string) error {
+	body := map[string]any{"trackers": []map[string]any{{
+		"transaction_id":     captureID,
+		"status":             "DELIVERED",
+		"carrier":            "OTHER",
+		"carrier_name_other": "Invoice",
+		"notify_buyer":       false,
+	}}}
+	var out struct {
+		Errors []struct {
+			Name    string `json:"name"`
+			Message string `json:"message"`
+			Details []struct {
+				Issue string `json:"issue"`
+			} `json:"details"`
+		} `json:"errors"`
+	}
+	if err := call(ctx, c, http.MethodPost, "/v1/shipping/trackers-batch", body, "track-"+captureID, &out); err != nil {
+		return err
+	}
+	for _, e := range out.Errors {
+		if strings.Contains(e.Name, "ALREADY_EXISTS") || strings.Contains(e.Message, "already exists") {
+			continue // marked before
+		}
+		pe := &Error{Status: 200, Name: e.Name, Message: e.Message}
+		if len(e.Details) > 0 {
+			pe.Issue = e.Details[0].Issue
+		}
+		return pe
+	}
+	return nil
+}
