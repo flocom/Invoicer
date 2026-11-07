@@ -65,6 +65,7 @@ var common = [][3]string{
 	{"stripelog.section", "Online payments", "Paiements en ligne"},
 	{"stripelog.paypal.created", "PayPal payment started", "Paiement PayPal commencé"},
 	{"stripelog.paypal.received", "PayPal payment received", "Paiement PayPal reçu"},
+	{"stripelog.paypal.delivered", "Marked delivered on PayPal (no tracking, client not notified)", "Marqué livré sur PayPal (sans suivi, client non prévenu)"},
 	{"stripelog.paypal.failed", "PayPal payment failed", "Échec du paiement PayPal"},
 	{"stripelog.paypal.pending", "PayPal payment under review", "Paiement PayPal en cours de vérification"},
 	{"stripelog.paypal.stale", "PayPal payment not taken: the invoice changed", "Paiement PayPal non encaissé : la facture a changé"},
