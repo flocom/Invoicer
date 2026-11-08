@@ -68,9 +68,12 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 		}
 		switch {
 		case p == "/v1/shipping/trackers-batch" && r.Method == "POST":
+			if r.Header.Get("PayPal-Request-Id") != "" {
+				t.Error("a tracking retry must not reuse a request id")
+			}
 			if f.trackErr {
-				w.WriteHeader(500)
-				io.WriteString(w, `{"name":"INTERNAL_SERVER_ERROR","message":"boom"}`)
+				// PayPal answers 200 with the error in the batch
+				io.WriteString(w, `{"tracker_identifiers":[],"errors":[{"name":"INVALID_REQUEST","message":"Request is not well-formed","details":[{"issue":"INVALID_STATUS"}]}]}`)
 				return
 			}
 			var body struct {
@@ -292,7 +295,8 @@ func TestPayPalPayments(t *testing.T) {
 		t.Fatalf("trackers: %v", pp.trackers)
 	}
 	tr := pp.trackers[0]
-	if tr["transaction_id"] != "CAP-"+id || tr["status"] != "DELIVERED" || tr["notify_buyer"] != false || tr["tracking_number"] != nil {
+	if tr["transaction_id"] != "CAP-"+id || tr["status"] != "DELIVERED" || tr["notify_buyer"] != false || tr["tracking_number"] != nil ||
+		tr["carrier"] != nil || len(tr) != 3 {
 		t.Fatalf("tracker: %v", tr)
 	}
 	b.must("Marked delivered on PayPal")
@@ -319,10 +323,21 @@ func TestPayPalPayments(t *testing.T) {
 	if len(pp.trackers) != 1 {
 		t.Fatal("tracking should have failed")
 	}
+	// PayPal's answer is shown on the invoice, with a button to try again
+	b.get("/c/1/invoices/" + strconv.FormatInt(inv.ID, 10))
+	b.must("PayPal refused to mark it delivered")
+	b.must("Request is not well-formed")
+	b.must("Not marked delivered on PayPal")
+	b.post("/c/1/invoices/"+strconv.FormatInt(inv.ID, 10)+"/paypal-delivered", url.Values{"payment": {"paypal:" + id}})
+	b.must("PayPal refused: paypal: Request is not well-formed")
 	pp.trackErr = false
 	e.app.ReconcilePayPal(t.Context())
 	if len(pp.trackers) != 2 || pp.trackers[1]["transaction_id"] != "CAP-"+id {
 		t.Fatalf("tracking retried: %v", pp.trackers)
+	}
+	b.get("/c/1/invoices/" + strconv.FormatInt(inv.ID, 10))
+	if strings.Contains(b.last, "Not marked delivered on PayPal") {
+		t.Fatal("button still shown once delivered")
 	}
 	e.app.ReconcilePayPal(t.Context())
 	if len(pp.trackers) != 2 {

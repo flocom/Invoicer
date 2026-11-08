@@ -635,3 +635,5 @@ ol.steps { margin: .6rem 0 0; padding-left: 1.2rem; display: flex; flex-directio
 .btn.is-busy { opacity: .7; cursor: progress; }
 @media (max-width: 600px) { .paybox { padding: 1rem; } .paybox-fields { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+.inline-form { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin-left: .35rem; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }

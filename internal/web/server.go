@@ -193,6 +193,7 @@ func (s *Server) Handler() http.Handler {
 	c("POST /c/{cid}/invoices/{id}/mark-sent", s.invoiceMarkSent)
 	c("POST /c/{cid}/invoices/{id}/payments", s.paymentAdd)
 	c("POST /c/{cid}/invoices/{id}/payments/{pid}/delete", s.paymentDelete)
+	c("POST /c/{cid}/invoices/{id}/paypal-delivered", s.invoicePayPalDelivered)
 	c("POST /c/{cid}/invoices/{id}/void", s.invoiceVoid)
 	c("POST /c/{cid}/invoices/{id}/delete", s.invoiceDelete)
 	c("POST /c/{cid}/invoices/{id}/duplicate", s.invoiceDuplicate)
