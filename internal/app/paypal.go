@@ -268,13 +268,29 @@ func (a *App) ApplyPayPalOrder(ctx context.Context, co *store.Company, orderID s
 
 // markPayPalDelivered tells PayPal the order was delivered (no tracking
 // number, buyer not notified); retried by the follow-up job if PayPal fails.
-func (a *App) markPayPalDelivered(ctx context.Context, co *store.Company, inv *store.Invoice, orderID, captureID string) {
+// PayPal's answer is written in the invoice's history (once per new error).
+func (a *App) markPayPalDelivered(ctx context.Context, co *store.Company, inv *store.Invoice, orderID, captureID string) error {
 	if err := paypal.MarkDelivered(ctx, a.PayPalCredentials(co), captureID); err != nil {
 		slog.Warn("paypal: not marked delivered", "order", orderID, "err", err)
-		return
+		if prev, _ := a.trackErrors.Swap(orderID, err.Error()); prev != err.Error() {
+			a.logStripe(co, inv, store.StripeLog{Event: "paypal.delivered_failed", Level: "warn", Ref: captureID, Detail: err.Error()})
+		}
+		return err
 	}
+	a.trackErrors.Delete(orderID)
 	a.Store.SetPayPalTracked(orderID)
 	a.logStripe(co, inv, store.StripeLog{Event: "paypal.delivered", Ref: captureID})
+	return nil
+}
+
+// MarkPayPalDelivered marks a paid order delivered now (button of the invoice
+// page) and returns PayPal's error, if any.
+func (a *App) MarkPayPalDelivered(ctx context.Context, co *store.Company, inv *store.Invoice, paymentKey string) error {
+	captureID, ok := a.Store.UntrackedPayPalPayments(inv.ID)[paymentKey]
+	if !ok {
+		return nil // already done
+	}
+	return a.markPayPalDelivered(ctx, co, inv, strings.TrimPrefix(paymentKey, "paypal:"), captureID)
 }
 
 // ReconcilePayPal follows up orders whose client did not come back from

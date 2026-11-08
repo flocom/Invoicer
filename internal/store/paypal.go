@@ -82,3 +82,21 @@ func (s *Store) UntrackedPayPalCaptures() ([]PayPalOrder, map[string]string, err
 	}
 	return out, caps, rows.Err()
 }
+
+// UntrackedPayPalPayments lists the paid orders of an invoice not yet marked
+// delivered on PayPal, keyed like their payment ("paypal:" + order id).
+func (s *Store) UntrackedPayPalPayments(invoiceID int64) map[string]string {
+	out := map[string]string{}
+	rows, err := s.DB.Query(`SELECT id, capture_id FROM paypal_orders WHERE invoice_id = ? AND status = 'complete' AND tracked = 0 AND capture_id != ''`, invoiceID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, c string
+		if rows.Scan(&id, &c) == nil {
+			out["paypal:"+id] = c
+		}
+	}
+	return out
+}

@@ -297,8 +297,29 @@ func (s *Server) invoiceView(c *Ctx) error {
 		"Invoice": inv, "Client": cl, "Buyer": buyer, "Payments": payments, "Emails": emails,
 		"TaxGroups": store.TaxGroups(inv.Lines), "PublicURL": s.App.PublicURL(inv), "CanSend": c.Company.HasResend(),
 		"HasStripe": c.Company.HasStripe() && inv.CardPayment, "Charges": charges, "Cards": cards,
-		"StripeLog": stripeLog,
+		"StripeLog": stripeLog, "PayPalUntracked": s.Store.UntrackedPayPalPayments(inv.ID),
 	}))
+}
+
+// invoicePayPalDelivered marks a PayPal payment delivered on PayPal now.
+func (s *Server) invoicePayPalDelivered(c *Ctx) error {
+	inv, err := s.loadInvoice(c)
+	if err != nil {
+		return err
+	}
+	back := c.cpath("/invoices/%d", inv.ID)
+	if !c.Company.HasPayPal() {
+		return c.redirect(back)
+	}
+	ctx, cancel := context.WithTimeout(c.R.Context(), 30*time.Second)
+	defer cancel()
+	if err := s.App.MarkPayPalDelivered(ctx, c.Company, inv, c.form("payment")); err != nil {
+		c.flash("err", c.t("invoice.paypal_delivered_failed")+" "+err.Error())
+		return c.redirect(back)
+	}
+	c.audit("paypal.delivered", inv.Number)
+	c.ok("invoice.paypal_delivered_done")
+	return c.redirect(back)
 }
 
 func (s *Server) loadInvoice(c *Ctx) (*store.Invoice, error) {

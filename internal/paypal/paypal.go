@@ -497,12 +497,12 @@ func (e *Event) OrderID() string {
 // goods already handed over). PayPal then releases the funds without asking
 // the seller for proof of shipment.
 func MarkDelivered(ctx context.Context, c Credentials, captureID string) error {
+	// exactly PayPal's documented "without tracking number" request: no
+	// carrier, no tracking number
 	body := map[string]any{"trackers": []map[string]any{{
-		"transaction_id":     captureID,
-		"status":             "DELIVERED",
-		"carrier":            "OTHER",
-		"carrier_name_other": "Invoice",
-		"notify_buyer":       false,
+		"transaction_id": captureID,
+		"status":         "DELIVERED",
+		"notify_buyer":   false,
 	}}}
 	var out struct {
 		Errors []struct {
@@ -513,7 +513,9 @@ func MarkDelivered(ctx context.Context, c Credentials, captureID string) error {
 			} `json:"details"`
 		} `json:"errors"`
 	}
-	if err := call(ctx, c, http.MethodPost, "/v1/shipping/trackers-batch", body, "track-"+captureID, &out); err != nil {
+	// no PayPal-Request-Id: PayPal would answer every retry with the first
+	// (failed) response
+	if err := call(ctx, c, http.MethodPost, "/v1/shipping/trackers-batch", body, "", &out); err != nil {
 		return err
 	}
 	for _, e := range out.Errors {

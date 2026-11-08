@@ -85,7 +85,10 @@
         {{range $d.Payments}}
         <tr>
           <td class="nowrap">{{$.Date .PaidOn}}</td>
-          <td>{{$.TS "method." .Method}}{{if .Reference}} <span class="muted small mono">{{.Reference}}</span>{{end}}</td>
+          <td>{{$.TS "method." .Method}}{{if .Reference}} <span class="muted small mono">{{.Reference}}</span>{{end}}
+            {{if index $d.PayPalUntracked .StripeSessionID}}<form method="post" action="{{$.CPath "/invoices/%d/paypal-delivered" $inv.ID}}" class="inline-form">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="payment" value="{{.StripeSessionID}}">
+              <span class="chip warn">{{$.T "invoice.paypal_not_delivered"}}</span> <button class="link small" type="submit">{{$.T "invoice.paypal_mark_delivered"}}</button></form>{{end}}</td>
           <td class="r nowrap"><strong>{{$.Money .Amount $inv.Currency}}</strong></td>
           <td class="w1">{{if not .StripeSessionID}}<form method="post" action="{{$.CPath "/invoices/%d/payments/%d/delete" $inv.ID .ID}}" data-confirm="{{$.T "invoice.payment_delete_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="icon-btn" type="submit" aria-label="{{$.T "action.delete"}}">{{template "icon" "trash"}}</button></form>{{end}}</td>
         </tr>
