@@ -71,3 +71,14 @@ func TestRecurringListShowsManualSend(t *testing.T) {
 		t.Fatalf("expected one auto-send chip, got %d", n)
 	}
 }
+
+// The collected chart carries each month's amount for the hover tooltip.
+func TestDashboardChartTooltip(t *testing.T) {
+	e := newEnv(t)
+	b := setupOwner(t, e)
+	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
+	b.get("/c/1")
+	if n := strings.Count(b.last, `class="chart-tip">€0.00<`); n != 12 {
+		t.Fatalf("expected 12 chart tooltips, got %d", n)
+	}
+}
