@@ -449,4 +449,11 @@ ALTER TABLE paypal_orders ADD COLUMN tracked INTEGER NOT NULL DEFAULT 0;
 UPDATE paypal_orders SET capture_id = COALESCE((SELECT reference FROM payments WHERE stripe_session_id = 'paypal:' || paypal_orders.id), '')
 	WHERE status = 'complete';
 `,
+	// 17 — forget the "no e-mail address" errors left on schedules whose
+	// client has an address now
+	`
+UPDATE recurring SET last_error = ''
+	WHERE last_error = 'e-mail: the client has no e-mail address'
+	AND client_id IN (SELECT id FROM clients WHERE TRIM(email) != '' OR TRIM(cc_emails) != '');
+`,
 }

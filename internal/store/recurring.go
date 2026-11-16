@@ -225,6 +225,18 @@ func (s *Store) SetRecurringError(id int64, msg string) {
 	s.DB.Exec(`UPDATE recurring SET last_error = ? WHERE id = ?`, msg, id)
 }
 
+// ClearRecurringEmailError forgets the e-mail failure recorded on a schedule
+// once one of its invoices has been e-mailed successfully.
+func (s *Store) ClearRecurringEmailError(id int64) {
+	s.DB.Exec(`UPDATE recurring SET last_error = '' WHERE id = ? AND last_error LIKE 'e-mail:%'`, id)
+}
+
+// ClearRecurringErrorForClient forgets an error (exact message) recorded on
+// the schedules of a client, e.g. "no e-mail address" once one was added.
+func (s *Store) ClearRecurringErrorForClient(clientID int64, msg string) {
+	s.DB.Exec(`UPDATE recurring SET last_error = '' WHERE client_id = ? AND last_error = ?`, clientID, msg)
+}
+
 func (s *Store) SetRecurringActive(companyID, id int64, active bool) error {
 	_, err := s.DB.Exec(`UPDATE recurring SET active = ? WHERE id = ? AND company_id = ?`, b2i(active), id, companyID)
 	return err
