@@ -48,7 +48,8 @@
     <div class="card-head"><h2>{{.T "dash.collected"}} · {{.Company.DefaultCurrency}}</h2></div>
     <div class="chart" role="img" aria-label="{{.T "dash.collected"}}">
       {{range $d.Chart}}
-      <div class="chart-col" title="{{$.Money .Amount $.Company.DefaultCurrency}}">
+      <div class="chart-col" tabindex="0" aria-label="{{monthShort $.Lang .Label}} : {{$.Money .Amount $.Company.DefaultCurrency}}">
+        <b class="chart-tip">{{$.Money .Amount $.Company.DefaultCurrency}}</b>
         <svg viewBox="0 0 10 100" preserveAspectRatio="none" class="chart-bar" aria-hidden="true"><rect x="0" y="{{sub100 .Pct}}" width="10" height="{{.Pct}}" rx="1.5"/></svg>
         <span>{{monthShort $.Lang .Label}}</span>
       </div>

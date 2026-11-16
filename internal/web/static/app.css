@@ -365,6 +365,12 @@ a.stat:hover { text-decoration: none; border-color: var(--border-strong); box-sh
 .chart-bar rect { fill: var(--primary); opacity: .82; transition: opacity .12s; }
 .chart-col:hover .chart-bar rect { opacity: 1; }
 .chart-col span { font-size: .68rem; color: var(--muted); }
+.chart-col { position: relative; outline: none; }
+.chart-tip { position: absolute; left: 50%; top: 0; transform: translate(-50%, 4px);
+  z-index: 2; padding: .2rem .45rem; border-radius: 6px; background: var(--text); color: var(--bg); font-size: .72rem; font-weight: 600;
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s, transform .12s; }
+.chart-col:hover .chart-tip, .chart-col:focus-visible .chart-tip { opacity: 1; transform: translate(-50%, 0); }
+.chart-col:focus-visible .chart-bar rect { opacity: 1; }
 .setup-card { margin-bottom: 1.25rem; background: linear-gradient(135deg, #eceeff 0%, #f7f7ff 45%, var(--surface) 100%); border-color: color-mix(in srgb, var(--primary) 18%, var(--border)); }
 .checklist { list-style: none; padding: 0; margin: .85rem 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .5rem; }
 .checklist li { display: flex; align-items: center; gap: .5rem; }
@@ -637,3 +643,7 @@ ol.steps { margin: .6rem 0 0; padding-left: 1.2rem; display: flex; flex-directio
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 .inline-form { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin-left: .35rem; }
 .chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chart-col:nth-child(-n+2) .chart-tip { left: 0; transform: translate(0, 4px); }
+.chart-col:nth-child(-n+2):hover .chart-tip, .chart-col:nth-child(-n+2):focus-visible .chart-tip { transform: translate(0, 0); }
+.chart-col:nth-last-child(-n+2) .chart-tip { left: auto; right: 0; transform: translate(0, 4px); }
+.chart-col:nth-last-child(-n+2):hover .chart-tip, .chart-col:nth-last-child(-n+2):focus-visible .chart-tip { transform: translate(0, 0); }
