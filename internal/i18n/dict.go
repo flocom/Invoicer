@@ -709,6 +709,7 @@ var invoicesUI = [][3]string{
 	{"recurring.remaining_hint", "Empty = no limit.", "Vide = illimité."},
 	{"recurring.auto_send", "E-mail each invoice to the client automatically", "Envoyer automatiquement chaque facture au client par e-mail"},
 	{"recurring.auto_send_short", "auto-send", "envoi auto"},
+	{"recurring.manual_send_short", "manual send", "envoi manuel"},
 	{"recurring.auto_send_needs_email", "Configure e-mail sending (Resend) to enable automatic sending.", "Configurez l'envoi d'e-mails (Resend) pour activer l'envoi automatique."},
 	{"recurring.preview", "Next invoices:", "Prochaines factures :"},
 	{"recurring.amount", "Amount", "Montant"},

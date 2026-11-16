@@ -45,3 +45,29 @@ func TestRecurringNoRecipientErrorClearedWhenClientGetsEmail(t *testing.T) {
 		t.Fatalf("error kept after the invoice was e-mailed: %q", r.LastError)
 	}
 }
+
+// The schedule list says when invoices are not e-mailed automatically.
+func TestRecurringListShowsManualSend(t *testing.T) {
+	e := newEnv(t)
+	newFakeAPIs(t)
+	b := setupOwner(t, e)
+	b.post("/companies/new", url.Values{"name": {"Alpha"}, "currency": {"EUR"}, "lang": {"en"}})
+	e.app.Store.UpdateCompanyEmail(1, e.app.Box.Seal("re_test_key", "company:1:resend"), false, "billing@alpha.test", "", "")
+	b.post("/c/1/clients/new", url.Values{"name": {"Globex"}, "email": {"ap@globex.test"}, "lang": {"en"}})
+	base := url.Values{"client_id": {"1"}, "currency": {"EUR"}, "interval_count": {"1"}, "interval_unit": {"month"},
+		"next_run": {tomorrow()}, "due_days": {"30"}, "line_desc": {"Hosting"}, "line_qty": {"1"}, "line_price": {"10"}, "line_tax": {"0"}}
+	manual := url.Values{"name": {"Manual"}}
+	auto := url.Values{"name": {"Auto"}, "auto_send": {"1"}}
+	for k, v := range base {
+		manual[k], auto[k] = v, v
+	}
+	b.post("/c/1/recurring/new", manual)
+	b.post("/c/1/recurring/new", auto)
+	b.get("/c/1/recurring")
+	if n := strings.Count(b.last, ">manual send<"); n != 1 {
+		t.Fatalf("expected one manual send chip, got %d", n)
+	}
+	if n := strings.Count(b.last, ">auto-send<"); n != 1 {
+		t.Fatalf("expected one auto-send chip, got %d", n)
+	}
+}
