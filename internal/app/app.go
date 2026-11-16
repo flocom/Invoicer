@@ -196,6 +196,18 @@ func FileName(inv *store.Invoice) string {
 var ErrNoEmail = errors.New("e-mail is not configured for this company (Resend)")
 var ErrNoRecipient = errors.New("the client has no e-mail address")
 
+// ClientEmailsChanged clears the "no e-mail address" errors left on the
+// client's schedules once the client has an address.
+func (a *App) ClientEmailsChanged(cl *store.Client) {
+	if len(cl.Recipients()) > 0 {
+		a.Store.ClearRecurringErrorForClient(cl.ID, RecurringEmailError(ErrNoRecipient))
+	}
+}
+
+// RecurringEmailError is the message recorded on a schedule when the invoice
+// it generated could not be e-mailed.
+func RecurringEmailError(err error) string { return "e-mail: " + err.Error() }
+
 // SendInvoiceEmail sends the invoice (kind "invoice") or a reminder
 // ("reminder_before", "reminder_due", "reminder_overdue") with the PDF
 // attached. Drafts are issued first.
@@ -258,6 +270,9 @@ func (a *App) SendInvoiceEmail(ctx context.Context, co *store.Company, inv *stor
 	a.Store.LogEmail(log)
 	if kind == "invoice" {
 		a.Store.MarkSent(inv.ID)
+	}
+	if inv.RecurringID != 0 {
+		a.Store.ClearRecurringEmailError(inv.RecurringID)
 	}
 	return nil
 }

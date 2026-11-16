@@ -172,6 +172,7 @@ func (s *Server) clientSave(c *Ctx) error {
 	if err := s.Store.SaveClient(cl); err != nil {
 		return err
 	}
+	s.App.ClientEmailsChanged(cl)
 	if isNew {
 		c.audit("client.created", cl.Name)
 	}

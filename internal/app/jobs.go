@@ -230,7 +230,7 @@ func (a *App) generateRecurring(ctx context.Context, r *store.Recurring, today s
 		// only e-mail invoices generated for today, not catch-up backlog older than a week
 		if issue >= addDays(today, -7) {
 			if err := a.SendInvoiceEmail(ctx, co, issued, "invoice", "", 0, "recurring-"+issued.PublicToken); err != nil {
-				a.Store.SetRecurringError(r.ID, "e-mail: "+err.Error())
+				a.Store.SetRecurringError(r.ID, RecurringEmailError(err))
 			}
 		}
 	}
