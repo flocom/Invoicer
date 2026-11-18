@@ -619,7 +619,7 @@ var invoicesUI = [][3]string{
 	{"invoice.number_on_issue", "Number assigned on issue", "Numéro attribué à l'émission"},
 	{"invoice.due", "Due", "Reste"},
 	{"invoice.count", "%d invoice(s)", "%d facture(s)"},
-	{"invoice.search_ph", "Number, client…", "Numéro, client…"},
+	{"invoice.search_ph", "Number, client, contact…", "Numéro, client, contact…"},
 	{"invoice.empty_title", "No invoices here", "Aucune facture ici"},
 	{"invoice.empty_body", "Create an invoice, or set up a recurring one for subscriptions.", "Créez une facture, ou une facture récurrente pour les abonnements."},
 	{"invoice.need_client", "Add a client first", "Ajoutez d'abord un client"},

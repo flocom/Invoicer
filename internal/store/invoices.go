@@ -79,8 +79,9 @@ type Invoice struct {
 	CreatedAt        int64
 	UpdatedAt        int64
 
-	Lines      []Line
-	ClientName string
+	Lines         []Line
+	ClientName    string
+	ClientContact string // the client's contact person, shown under its name in lists
 }
 
 func (i *Invoice) Due() int64 { return i.Total - i.AmountPaid }
@@ -165,14 +166,14 @@ func ComputeTotals(lines []Line) (sub, tax, total int64) {
 const invoiceCols = `i.id, i.company_id, i.client_id, COALESCE(i.number, ''), i.status, i.currency, i.lang, i.issue_date, i.due_date,
 	i.subtotal, i.tax_total, i.total, i.amount_paid, i.notes, i.public_token, i.client_snapshot, i.company_snapshot,
 	i.recurring_id, i.reminders_enabled, i.reminders_sent, i.sent_at, i.paid_at, i.voided_at, i.created_at, i.updated_at, c.name,
-	i.bank_account_id, i.card_payment, i.auto_charge, i.paypal_payment`
+	i.bank_account_id, i.card_payment, i.auto_charge, i.paypal_payment, c.contact_name`
 
 func scanInvoice(row interface{ Scan(...any) error }) (*Invoice, error) {
 	i := &Invoice{}
 	err := row.Scan(&i.ID, &i.CompanyID, &i.ClientID, &i.Number, &i.Status, &i.Currency, &i.Lang, &i.IssueDate, &i.DueDate,
 		&i.Subtotal, &i.TaxTotal, &i.Total, &i.AmountPaid, &i.Notes, &i.PublicToken, &i.ClientSnapshot, &i.CompanySnapshot,
 		&i.RecurringID, &i.RemindersEnabled, &i.RemindersSent, &i.SentAt, &i.PaidAt, &i.VoidedAt, &i.CreatedAt, &i.UpdatedAt, &i.ClientName,
-		&i.BankAccountID, &i.CardPayment, &i.AutoCharge, &i.PayPalPayment)
+		&i.BankAccountID, &i.CardPayment, &i.AutoCharge, &i.PayPalPayment, &i.ClientContact)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -247,8 +248,8 @@ func (s *Store) Invoices(companyID int64, f InvoiceFilter) ([]*Invoice, int, err
 	}
 	if f.Search != "" {
 		like := "%" + escapeLike(f.Search) + "%"
-		where += ` AND (i.number LIKE ? ESCAPE '\' OR c.name LIKE ? ESCAPE '\' OR i.notes LIKE ? ESCAPE '\')`
-		args = append(args, like, like, like)
+		where += ` AND (i.number LIKE ? ESCAPE '\' OR c.name LIKE ? ESCAPE '\' OR c.contact_name LIKE ? ESCAPE '\' OR i.notes LIKE ? ESCAPE '\')`
+		args = append(args, like, like, like, like)
 	}
 	var total int
 	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM invoices i JOIN clients c ON c.id = i.client_id`+where, args...).Scan(&total); err != nil {

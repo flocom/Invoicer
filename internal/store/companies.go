@@ -334,6 +334,7 @@ type Client struct {
 	CompanyID   int64
 	Name        string
 	ContactName string
+	Phone       string
 	Email       string
 	CCEmails    string
 	Address     string
@@ -362,11 +363,11 @@ func (c *Client) Recipients() []string {
 	return out
 }
 
-const clientCols = `id, company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, archived, shared, created_at`
+const clientCols = `id, company_id, name, contact_name, phone, email, cc_emails, address, tax_id, lang, currency, notes, archived, shared, created_at`
 
 func scanClient(row interface{ Scan(...any) error }) (*Client, error) {
 	c := &Client{}
-	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.ContactName, &c.Email, &c.CCEmails, &c.Address, &c.TaxID, &c.Lang,
+	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.ContactName, &c.Phone, &c.Email, &c.CCEmails, &c.Address, &c.TaxID, &c.Lang,
 		&c.Currency, &c.Notes, &c.Archived, &c.Shared, &c.CreatedAt)
 	if err != nil {
 		return nil, notFound(err)
@@ -381,9 +382,9 @@ func (s *Store) Clients(companyID int64, includeArchived bool, search string) ([
 		q += ` AND archived = 0`
 	}
 	if search != "" {
-		q += ` AND (name LIKE ? ESCAPE '\' OR email LIKE ? ESCAPE '\' OR contact_name LIKE ? ESCAPE '\')`
+		q += ` AND (name LIKE ? ESCAPE '\' OR email LIKE ? ESCAPE '\' OR contact_name LIKE ? ESCAPE '\' OR phone LIKE ? ESCAPE '\')`
 		like := "%" + escapeLike(search) + "%"
-		args = append(args, like, like, like)
+		args = append(args, like, like, like, like)
 	}
 	q += ` ORDER BY archived, name COLLATE NOCASE`
 	rows, err := s.DB.Query(q, args...)
@@ -413,8 +414,8 @@ func (s *Store) Client(companyID, id int64) (*Client, error) {
 
 func (s *Store) SaveClient(c *Client) error {
 	if c.ID == 0 {
-		res, err := s.DB.Exec(`INSERT INTO clients(company_id, name, contact_name, email, cc_emails, address, tax_id, lang, currency, notes, shared, created_at)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, c.CompanyID, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
+		res, err := s.DB.Exec(`INSERT INTO clients(company_id, name, contact_name, phone, email, cc_emails, address, tax_id, lang, currency, notes, shared, created_at)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, c.CompanyID, c.Name, c.ContactName, c.Phone, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
 			b2i(c.Shared), now())
 		if err != nil {
 			return err
@@ -422,8 +423,8 @@ func (s *Store) SaveClient(c *Client) error {
 		c.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err := s.DB.Exec(`UPDATE clients SET name=?, contact_name=?, email=?, cc_emails=?, address=?, tax_id=?, lang=?, currency=?, notes=?, archived=?,
-		shared=? WHERE id=? AND company_id=?`, c.Name, c.ContactName, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
+	_, err := s.DB.Exec(`UPDATE clients SET name=?, contact_name=?, phone=?, email=?, cc_emails=?, address=?, tax_id=?, lang=?, currency=?, notes=?, archived=?,
+		shared=? WHERE id=? AND company_id=?`, c.Name, c.ContactName, c.Phone, c.Email, c.CCEmails, c.Address, c.TaxID, c.Lang, c.Currency, c.Notes,
 		b2i(c.Archived), b2i(c.Shared), c.ID, c.CompanyID)
 	return err
 }

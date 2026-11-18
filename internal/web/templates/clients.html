@@ -18,7 +18,7 @@
   {{range $d.Clients}}
   <tr class="{{if .Archived}}is-archived{{end}}">
     <td><a class="row-link" href="{{$.CPath "/clients/%d" .ID}}"><strong>{{.Name}}</strong></a>{{if .Shared}} <span class="chip">{{$.T "client.shared"}}</span>{{end}}{{if .ContactName}}<div class="muted small">{{.ContactName}}</div>{{end}}</td>
-    <td class="muted">{{.Email}}</td>
+    <td class="muted">{{.Email}}{{if .Phone}}<div class="small">{{.Phone}}</div>{{end}}</td>
     <td><span class="chip">{{upper .Lang}}</span></td>
     <td class="r">{{range $.Totals .Outstanding}}<div>{{.}}</div>{{else}}<span class="muted">–</span>{{end}}</td>
   </tr>

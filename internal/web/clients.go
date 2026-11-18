@@ -94,6 +94,7 @@ func validEmails(list string) bool {
 func readClientForm(c *Ctx, cl *store.Client) {
 	cl.Name = clip(c.form("name"), 200)
 	cl.ContactName = clip(c.form("contact_name"), 200)
+	cl.Phone = clip(c.form("phone"), 40)
 	cl.Email = clip(c.form("email"), 200)
 	cl.CCEmails = clip(c.form("cc_emails"), 600)
 	cl.Address = clip(c.form("address"), 1000)
