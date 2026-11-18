@@ -17,6 +17,7 @@
       {{if $cl.ContactName}}<dt>{{.T "field.contact_name"}}</dt><dd>{{$cl.ContactName}}</dd>{{end}}
       <dt>{{.T "field.email"}}</dt><dd>{{if $cl.Email}}{{$cl.Email}}{{else}}<span class="warn-text">{{.T "client.no_email"}}</span>{{end}}</dd>
       {{if $cl.CCEmails}}<dt>{{.T "field.cc"}}</dt><dd>{{$cl.CCEmails}}</dd>{{end}}
+      {{if $cl.Phone}}<dt>{{.T "field.phone"}}</dt><dd><a href="tel:{{$cl.Phone}}">{{$cl.Phone}}</a></dd>{{end}}
       {{if $cl.Address}}<dt>{{.T "field.address"}}</dt><dd>{{range lines $cl.Address}}{{.}}<br>{{end}}</dd>{{end}}
       {{if $cl.TaxID}}<dt>{{.T "field.tax_id"}}</dt><dd>{{$cl.TaxID}}</dd>{{end}}
       <dt>{{.T "field.doc_language"}}</dt><dd>{{.TS "lang." $cl.Lang}}</dd>

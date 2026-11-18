@@ -456,4 +456,8 @@ UPDATE recurring SET last_error = ''
 	WHERE last_error = 'e-mail: the client has no e-mail address'
 	AND client_id IN (SELECT id FROM clients WHERE TRIM(email) != '' OR TRIM(cc_emails) != '');
 `,
+	// 18 — a phone number on the client record
+	`
+ALTER TABLE clients ADD COLUMN phone TEXT NOT NULL DEFAULT '';
+`,
 }

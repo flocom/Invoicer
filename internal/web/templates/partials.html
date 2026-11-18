@@ -90,7 +90,7 @@
   {{range .Invoices}}
   <tr>
     <td><a href="{{$p.CPath "/invoices/%d" .ID}}" class="row-link">{{if .Number}}<span class="mono">{{.Number}}</span>{{else}}<span class="muted">{{$p.T "invoice.draft"}}</span>{{end}}</a></td>
-    <td>{{.ClientName}}</td>
+    <td>{{.ClientName}}{{if .ClientContact}}<div class="muted small">{{.ClientContact}}</div>{{end}}</td>
     <td class="nowrap">{{$p.Date .IssueDate}}</td>
     <td class="nowrap">{{$p.Date .DueDate}}</td>
     <td>{{template "badge" (dict "P" $p "S" ($p.Status .))}}</td>
