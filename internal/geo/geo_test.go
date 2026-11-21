@@ -31,3 +31,12 @@ func TestLiveSearch(t *testing.T) {
 		t.Logf("%-28s → [%s] %q", q, res[0].Source, res[0].Lines)
 	}
 }
+
+func TestCountryCode(t *testing.T) {
+	for in, want := range map[string]string{"Suisse": "CH", " switzerland ": "CH", "ch": "CH", "ÉTATS-UNIS": "US",
+		"Royaume-Uni": "GB", "United Kingdom": "GB", "Côte d'Ivoire": "CI", "1204 Genève": "", "": "", "Atlantis": ""} {
+		if got := CountryCode(in); got != want {
+			t.Errorf("CountryCode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -27,12 +27,14 @@ type fakePayPal struct {
 	n        int
 	hooks    map[string]string // webhook id → url
 	hookN    int
-	trackers []map[string]any // tracking info added to captures
-	trackErr bool             // the tracking API fails
+	trackers []map[string]any          // tracking info added to captures
+	trackErr bool                      // the tracking API fails
+	payers   map[string]map[string]any // id → payer details sent with the order
+	rejected int                       // orders refused for their payer details
 }
 
 func newFakePayPal(t *testing.T) *fakePayPal {
-	f := &fakePayPal{orders: map[string]map[string]any{}, landing: map[string]string{}, status: map[string]string{}, hooks: map[string]string{}}
+	f := &fakePayPal{orders: map[string]map[string]any{}, payers: map[string]map[string]any{}, landing: map[string]string{}, status: map[string]string{}, hooks: map[string]string{}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -128,7 +130,10 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 				PurchaseUnits []map[string]any `json:"purchase_units"`
 				PaymentSource struct {
 					PayPal struct {
-						Ctx map[string]string `json:"experience_context"`
+						Ctx     map[string]string `json:"experience_context"`
+						Email   string            `json:"email_address"`
+						Name    map[string]string `json:"name"`
+						Address map[string]string `json:"address"`
 					} `json:"paypal"`
 					Card *struct {
 						Attributes struct {
@@ -140,8 +145,17 @@ func newFakePayPal(t *testing.T) *fakePayPal {
 				} `json:"payment_source"`
 			}
 			json.NewDecoder(r.Body).Decode(&body)
+			if pp := body.PaymentSource.PayPal; pp.Address["postal_code"] == "00000" {
+				f.rejected++
+				w.WriteHeader(422)
+				io.WriteString(w, `{"name":"UNPROCESSABLE_ENTITY","details":[{"issue":"POSTAL_CODE_REQUIRED"}],"message":"invalid"}`)
+				return
+			}
 			f.n++
 			id := fmt.Sprintf("ORDER%d", f.n)
+			if pp := body.PaymentSource.PayPal; pp.Email != "" || pp.Name != nil || pp.Address != nil {
+				f.payers[id] = map[string]any{"email": pp.Email, "name": pp.Name, "address": pp.Address}
+			}
 			f.orders[id] = body.PurchaseUnits[0]
 			f.landing[id] = body.PaymentSource.PayPal.Ctx["landing_page"] + "|" + body.PaymentSource.PayPal.Ctx["return_url"]
 			if c := body.PaymentSource.Card; c != nil {

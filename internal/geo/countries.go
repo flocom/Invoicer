@@ -1,5 +1,7 @@
 package geo
 
+import "strings"
+
 // countryName returns the country name in the document language; unknown
 // codes fall back to the provider's own name.
 func countryName(cc, lang string) string {
@@ -31,4 +33,27 @@ var countries = map[string][2]string{
 	"SI": {"Slovenia", "Slovénie"}, "SK": {"Slovakia", "Slovaquie"}, "SN": {"Senegal", "Sénégal"}, "TN": {"Tunisia", "Tunisie"},
 	"TR": {"Türkiye", "Turquie"}, "UA": {"Ukraine", "Ukraine"}, "US": {"United States", "États-Unis"}, "ZA": {"South Africa", "Afrique du Sud"},
 	"CI": {"Côte d'Ivoire", "Côte d'Ivoire"}, "CM": {"Cameroon", "Cameroun"}, "QA": {"Qatar", "Qatar"}, "TH": {"Thailand", "Thaïlande"},
+}
+
+// CountryCode recognises a country written on an address line, by its
+// English or French name or its ISO code ("Suisse", "Switzerland", "CH").
+// It returns "" when the line names no known country.
+func CountryCode(line string) string {
+	key := strings.Join(strings.Fields(fold.Replace(strings.ToLower(strings.TrimSpace(line)))), " ")
+	if key == "" {
+		return ""
+	}
+	if len(key) == 2 {
+		if _, ok := countries[strings.ToUpper(key)]; ok {
+			return strings.ToUpper(key)
+		}
+	}
+	for cc, n := range countries {
+		for _, name := range n {
+			if key == strings.Join(strings.Fields(fold.Replace(strings.ToLower(name))), " ") {
+				return cc
+			}
+		}
+	}
+	return ""
 }
