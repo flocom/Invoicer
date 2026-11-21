@@ -257,6 +257,43 @@ type OrderParams struct {
 	ReturnURL   string
 	CancelURL   string
 	RequestID   string
+	Payer       Payer // pre-fills PayPal's sign-up and card forms; optional
+}
+
+// Payer is what Invoicer knows of the client, sent so the client does not
+// type it again on PayPal's page. Empty fields are left out.
+type Payer struct {
+	Email      string
+	GivenName  string
+	Surname    string
+	Street     string // first address line
+	Street2    string
+	City       string
+	PostalCode string
+	Country    string // ISO code; the address is only sent with one
+}
+
+func (p Payer) empty() bool { return p == Payer{} }
+
+func (p Payer) json() map[string]any {
+	out := map[string]any{}
+	if p.Email != "" {
+		out["email_address"] = truncate(p.Email, 254)
+	}
+	if p.GivenName != "" && p.Surname != "" {
+		out["name"] = map[string]string{"given_name": truncate(p.GivenName, 140), "surname": truncate(p.Surname, 140)}
+	}
+	if p.Country != "" && (p.City != "" || p.PostalCode != "") {
+		a := map[string]string{"country_code": p.Country}
+		for k, v := range map[string]string{"address_line_1": truncate(p.Street, 300), "address_line_2": truncate(p.Street2, 300),
+			"admin_area_2": truncate(p.City, 120), "postal_code": truncate(p.PostalCode, 60)} {
+			if v != "" {
+				a[k] = v
+			}
+		}
+		out["address"] = a
+	}
+	return out
 }
 
 // CreateOrder creates an order the client approves on PayPal's page.
@@ -284,7 +321,8 @@ func CreateOrder(ctx context.Context, c Credentials, p OrderParams) (*Order, err
 		}
 		return &o, nil
 	}
-	body["payment_source"] = map[string]any{"paypal": map[string]any{"experience_context": map[string]string{
+	source := p.Payer.json()
+	source["experience_context"] = map[string]string{
 		"brand_name":          truncate(p.BrandName, 127),
 		"locale":              p.Locale,
 		"landing_page":        landing,
@@ -292,9 +330,23 @@ func CreateOrder(ctx context.Context, c Credentials, p OrderParams) (*Order, err
 		"shipping_preference": "NO_SHIPPING",
 		"return_url":          p.ReturnURL,
 		"cancel_url":          p.CancelURL,
-	}}}
+	}
+	body["payment_source"] = map[string]any{"paypal": source}
 	var o Order
-	if err := call(ctx, c, http.MethodPost, "/v2/checkout/orders", body, p.RequestID, &o); err != nil {
+	err := call(ctx, c, http.MethodPost, "/v2/checkout/orders", body, p.RequestID, &o)
+	var pe *Error
+	if err != nil && !p.Payer.empty() && errors.As(err, &pe) && (pe.Status == http.StatusBadRequest || pe.Status == http.StatusUnprocessableEntity) {
+		// the client's details are only a convenience: never let a badly
+		// written address stop the payment
+		if p.Payer.Country != "" {
+			p.Payer.Street, p.Payer.Street2, p.Payer.City, p.Payer.PostalCode, p.Payer.Country = "", "", "", "", ""
+		} else {
+			p.Payer = Payer{}
+		}
+		p.RequestID += "-retry"
+		return CreateOrder(ctx, c, p)
+	}
+	if err != nil {
 		return nil, err
 	}
 	if o.ApproveURL() == "" {

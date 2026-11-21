@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/flocom/invoicer/internal/geo"
 	"github.com/flocom/invoicer/internal/i18n"
 	"github.com/flocom/invoicer/internal/money"
 	"github.com/flocom/invoicer/internal/paypal"
@@ -177,7 +179,7 @@ func (a *App) payPalOrder(ctx context.Context, co *store.Company, inv *store.Inv
 		Amount: inv.Due(), Currency: inv.Currency, Description: i18n.T(lang, "pdf.invoice") + " " + inv.Number,
 		CustomID: co.PublicID + ":" + strconv.FormatInt(inv.ID, 10), BrandName: co.DisplayName(), Locale: paypalLocale[lang],
 		Card: card && co.PayPalCard, Inline: inline, ReturnURL: a.BaseURL() + "/paypal/" + inv.PublicToken + "/return", CancelURL: a.PublicURL(inv),
-		RequestID: "invoicer-" + security.Token(12),
+		RequestID: "invoicer-" + security.Token(12), Payer: payPalPayer(inv.Buyer()),
 	})
 	if err != nil {
 		return nil, err
@@ -319,4 +321,46 @@ func (a *App) ReconcilePayPal(ctx context.Context) {
 			slog.Warn("paypal follow-up", "order", o.ID, "err", err)
 		}
 	}
+}
+
+var postalPlace = regexp.MustCompile(`^(?:[A-Za-z]{1,2}-)?(\d{4,6})\s+(.+)$`)
+
+// payPalPayer turns the client written on the invoice into what PayPal
+// pre-fills: e-mail, the contact's name, and the address when its last line
+// names a country (the address is free text, so nothing is guessed).
+func payPalPayer(b store.Party) paypal.Payer {
+	var p paypal.Payer
+	if f := strings.FieldsFunc(b.Email, func(r rune) bool { return r == ',' || r == ';' || r == ' ' }); len(f) > 0 {
+		p.Email = f[0]
+	}
+	if w := strings.Fields(b.ContactName); len(w) >= 2 {
+		p.GivenName, p.Surname = strings.Join(w[:len(w)-1], " "), w[len(w)-1]
+	}
+	var lines []string
+	for _, l := range strings.Split(b.Address, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) < 2 {
+		return p
+	}
+	cc := geo.CountryCode(lines[len(lines)-1])
+	if cc == "" {
+		return p
+	}
+	lines = lines[:len(lines)-1]
+	place := lines[len(lines)-1]
+	lines = lines[:len(lines)-1]
+	if m := postalPlace.FindStringSubmatch(place); m != nil {
+		p.PostalCode, p.City = m[1], m[2]
+	} else {
+		p.City = place
+	}
+	if len(lines) > 0 {
+		p.Street = lines[0]
+		p.Street2 = strings.Join(lines[1:], ", ")
+	}
+	p.Country = cc
+	return p
 }

@@ -392,7 +392,8 @@
       var f = fold(q.trim()), sel0 = current();
       items = [];
       Array.prototype.forEach.call(sel.options, function (o) {
-        if (o.value && (!f || fold(o.text).indexOf(f) !== -1)) items.push({ opt: o });
+        // the client's name or its contact person
+        if (o.value && (!f || fold(o.text).indexOf(f) !== -1 || fold(o.getAttribute("data-contact") || "").indexOf(f) !== -1)) items.push({ opt: o });
       });
       if (clientDialog) items.push({ create: q.trim() });
       list.textContent = "";
@@ -404,6 +405,13 @@
         el.setAttribute("role", "option");
         if (it.opt) {
           el.textContent = it.opt.text;
+          var contact = it.opt.getAttribute("data-contact");
+          if (contact) {
+            var small = document.createElement("span");
+            small.className = "ac-sub";
+            small.textContent = contact;
+            el.appendChild(small);
+          }
           if (it.opt === sel0) { el.classList.add("current"); el.setAttribute("aria-selected", "true"); if (!f) start = i; }
         } else {
           el.classList.add("ac-create");
